@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import ApiResponseUtil from "./src/utils/apiResponse.js";
+import ApiResponseUtil from "./src/utils/helpers/apiResponse.utils.js";
 
 const app = express();
 
