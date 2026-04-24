@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import crypto from "crypto";
+import { env } from "../../lib/env.js";
 
 const messageStatsSchema = new mongoose.Schema(
   {
@@ -137,11 +138,7 @@ whatsappSchema.methods.encryptToken = function (token) {
   if (!token) return null;
 
   const algorithm = "aes-256-gcm";
-  const key = crypto.scryptSync(
-    process.env.WHATSAPP_ENCRYPTION_KEY,
-    "salt",
-    32,
-  );
+  const key = crypto.scryptSync(env.WHATSAPP_ENCRYPTION_KEY, "salt", 32);
   const iv = crypto.randomBytes(16);
 
   const cipher = crypto.createCipheriv(algorithm, key, iv);

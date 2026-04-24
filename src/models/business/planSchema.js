@@ -111,6 +111,9 @@ planSchema.methods.canSendMessage = function () {
 };
 
 planSchema.methods.resetMonthlyUsage = function () {
+  if (!this.usage) {
+    this.usage = {};
+  }
   const now = new Date();
   const resetDate = new Date(this.usage.messagesResetAt);
 

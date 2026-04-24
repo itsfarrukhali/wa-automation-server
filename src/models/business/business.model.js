@@ -20,7 +20,6 @@ const businessSchema = new mongoose.Schema(
     },
     slug: {
       type: String,
-      unique: true,
       lowercase: true,
       trim: true,
     },
@@ -43,7 +42,6 @@ const businessSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
     staffIds: [
       {
@@ -207,38 +205,31 @@ const businessSchema = new mongoose.Schema(
 businessSchema.index({ ownerId: 1 });
 businessSchema.index({ city: 1, type: 1 });
 businessSchema.index({ slug: 1 });
-businessSchema.index({ "location.coordinates": "2dsphere" });
 businessSchema.index({ onboardingComplete: 1, isActive: 1 });
 
 // Middleware
-businessSchema.pre("save", async function (next) {
-  try {
-    // Generate slug
-    if (!this.slug && this.name) {
-      this.slug =
-        this.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, "-")
-          .replace(/-+/g, "-")
-          .replace(/^-|-$/g, "") +
-        "-" +
-        crypto.randomBytes(3).toString("hex");
-    }
+businessSchema.pre("save", async function () {
+  // Generate slug if missing
+  if (!this.slug && this.name) {
+    this.slug =
+      this.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "") +
+      "-" +
+      crypto.randomBytes(3).toString("hex");
+  }
 
-    // Reset monthly usage if needed
-    if (this.plan && typeof this.plan.resetMonthlyUsage === "function") {
-      this.plan.resetMonthlyUsage();
-    }
+  // Reset monthly usage if method exists
+  if (this.plan && typeof this.plan.resetMonthlyUsage === "function") {
+    this.plan.resetMonthlyUsage();
+  }
 
-    // Complete onboarding
-    if (this.onboardingStep === 5 && !this.onboardingCompletedAt) {
-      this.onboardingCompletedAt = new Date();
-      this.onboardingComplete = true;
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+  // Complete onboarding when reaching step 5
+  if (this.onboardingStep === 5 && !this.onboardingCompletedAt) {
+    this.onboardingCompletedAt = new Date();
+    this.onboardingComplete = true;
   }
 });
 
