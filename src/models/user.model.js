@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { env } from "../lib/env.js";
 
 const refreshTokenSchema = new mongoose.Schema(
   {
@@ -115,6 +116,11 @@ const userSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
+    tokenVersion: {
+      type: Number,
+      default: 1,
+      select: false,
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -218,63 +224,78 @@ userSchema.virtual("isLocked").get(function () {
 });
 
 // Hash password before saving
-userSchema.pre("save", async function (next) {
-  try {
-    if (!this.isModified("password")) return next();
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
 
-    // Check password history (prevent reuse of last 3 passwords)
-    if (this.passwordHistory && this.passwordHistory.length > 0) {
-      for (const oldHash of this.passwordHistory.slice(-3)) {
-        const isReused = await bcrypt.compare(this.password, oldHash);
-        if (isReused) {
-          throw new Error("Cannot reuse your last 3 passwords");
-        }
+  // Check password history (prevent reuse of last 3 passwords)
+  if (this.passwordHistory && this.passwordHistory.length > 0) {
+    for (const oldHash of this.passwordHistory.slice(-3)) {
+      const isReused = await bcrypt.compare(this.password, oldHash);
+      if (isReused) {
+        const validationError = new mongoose.Error.ValidationError(this);
+        validationError.addError(
+          "password",
+          new mongoose.Error.ValidatorError({
+            path: "password",
+            message: "Cannot reuse your last 3 passwords",
+            value: this.password,
+          }),
+        );
+        throw validationError;
       }
     }
+  }
 
-    // Hash new password
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(this.password, salt);
+  // Hash new password
+  const salt = await bcrypt.genSalt(12);
+  const hashedPassword = await bcrypt.hash(this.password, salt);
 
-    // Add to password history before updating
-    if (!this.passwordHistory) this.passwordHistory = [];
-    this.passwordHistory.push(hashedPassword);
+  // Add to password history before updating
+  if (!this.passwordHistory) this.passwordHistory = [];
+  this.passwordHistory.push(hashedPassword);
 
-    // Keep only last 5 passwords in history
-    if (this.passwordHistory.length > 5) {
-      this.passwordHistory = this.passwordHistory.slice(-5);
-    }
+  // Keep only last 5 passwords in history
+  if (this.passwordHistory.length > 5) {
+    this.passwordHistory = this.passwordHistory.slice(-5);
+  }
 
-    this.password = hashedPassword;
+  this.password = hashedPassword;
 
-    // Set password changed timestamp (skip for new users)
-    if (!this.isNew) {
-      this.passwordChangedAt = new Date();
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+  // Set password changed timestamp (skip for new users)
+  if (!this.isNew) {
+    this.passwordChangedAt = new Date();
   }
 });
+
+// Generate email verification token
+userSchema.methods.generateEmailVerificationToken = function () {
+  const token = crypto.randomBytes(32).toString("hex");
+  this.verificationToken = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+  this.verificationTokenExpiry = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  return token; // raw token sent via email
+};
 
 // Generate access token (short-lived)
 userSchema.methods.generateAuthToken = function () {
   return jwt.sign(
     {
-      _id: this._id,
+      userId: this._id,
       email: this.email,
       role: this.role,
+      businessId: this.businessId,
       tokenVersion: this.tokenVersion || 1,
     },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "15m" },
+    env.JWT_ACCESS_SECRET,
+    { expiresIn: env.JWT_EXPIRES_IN || "15m" },
   );
 };
 
 // Generate refresh token (long-lived, hashed in DB)
 userSchema.methods.generateRefreshToken = function (deviceInfo = {}) {
-  const expiryDays = parseInt(process.env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
+  const expiryDays = parseInt(env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
 
   // Create token with unique identifier
   const tokenId = crypto.randomBytes(16).toString("hex");
@@ -285,7 +306,7 @@ userSchema.methods.generateRefreshToken = function (deviceInfo = {}) {
       tokenId: tokenId,
       tokenVersion: this.tokenVersion || 1,
     },
-    process.env.JWT_REFRESH_SECRET,
+    env.JWT_REFRESH_SECRET,
     { expiresIn: `${expiryDays}d` },
   );
 

@@ -8,14 +8,12 @@ const locationSchema = new mongoose.Schema(
       default: "Point",
     },
     coordinates: {
-      type: {
-        longitude: Number,
-        latitude: Number,
-      },
+      type: [Number],
       required: true,
       validate: {
         validator: function (v) {
           return (
+            Array.isArray(v) &&
             v.length === 2 &&
             v[0] >= -180 &&
             v[0] <= 180 &&
@@ -23,7 +21,7 @@ const locationSchema = new mongoose.Schema(
             v[1] <= 90
           );
         },
-        message: "Invalid coordinates",
+        message: "Invalid coordinates. Must be [longitude, latitude]",
       },
     },
     address: {

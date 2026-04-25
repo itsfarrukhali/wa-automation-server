@@ -1,9 +1,9 @@
 import app from "./app.js";
 import http from "http";
 import connectToDB from "./src/config/db.js";
-import ENV from "./src/lib/env.js";
+import { env } from "./src/lib/env.js";
 
-const PORT = ENV.PORT;
+const PORT = env.PORT;
 
 const startServer = async () => {
   try {

@@ -31,6 +31,7 @@ export const env = {
   WA_TOKEN: required("WA_TOKEN"),
   WA_PHONE_ID: required("WA_PHONE_ID"),
   WEBHOOK_VERIFY_TOKEN: required("WEBHOOK_VERIFY_TOKEN"),
+  WHATSAPP_ENCRYPTION_KEY: required("WHATSAPP_ENCRYPTION_KEY"),
 
   // Frontend URL for CORS
   CLIENT_URL: optional("CLIENT_URL", "http://localhost:5173"),
@@ -41,4 +42,9 @@ export const env = {
   // Upstash Redis (for BullMQ)
   UPSTASH_REDIS_URL: optional("UPSTASH_REDIS_URL"),
   UPSTASH_REDIS_TOKEN: optional("UPSTASH_REDIS_TOKEN"),
+
+  // Email (for notifications)
+  GMAIL_USER: required("GMAIL_USER"),
+  GMAIL_APP_PASSWORD: required("GMAIL_APP_PASSWORD"),
+  EMAIL_FROM: optional("EMAIL_FROM"),
 };

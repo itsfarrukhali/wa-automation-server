@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { env } from "../lib/env.js";
 
 const whatsappTrackingSchema = new mongoose.Schema(
   {
@@ -807,7 +808,7 @@ bookingSchema.methods.generateReviewLink = async function (platform) {
   }
 
   // Generate internal review link
-  return `${process.env.APP_URL}/review/${this._id}`;
+  return `${env.CLIENT_URL}/review/${this._id}`;
 };
 
 // Add payment

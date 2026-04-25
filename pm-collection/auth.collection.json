@@ -1,0 +1,654 @@
+{
+  "info": {
+    "name": "Zario — Auth API",
+    "description": "Complete auth test collection.\n\n**Quick start:**\n1. Set `baseUrl` variable (default: http://localhost:3000)\n2. Run **Register** first — tokens auto-save\n3. Run **Verify Email** using the `_devVerificationToken` from register response\n4. Run **Login** — access token auto-saves\n5. All protected routes use the saved token automatically\n\n**Collection variables used:**\n- `baseUrl` — your server URL\n- `accessToken` — auto-set by Register/Login/Refresh\n- `refreshToken` — for manual cookie simulation if needed\n- `verificationToken` — from register dev token\n- `resetToken` — from forgot-password dev token",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "verificationToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "resetToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Register",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "",
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "pm.test('Has accessToken', () => pm.expect(res.data).to.have.property('accessToken'));",
+              "pm.test('Has user profile', () => pm.expect(res.data.user).to.have.property('email'));",
+              "pm.test('Password not exposed', () => pm.expect(res.data.user).to.not.have.property('password'));",
+              "pm.test('isEmailVerified is false', () => pm.expect(res.data.user.isEmailVerified).to.be.false);",
+              "",
+              "if (res.success) {",
+              "  pm.collectionVariables.set('accessToken', res.data.accessToken);",
+              "  const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+              "  const match = setCookie.match(/refreshToken=([^;]+)/);",
+              "  if (match?.[1]) {",
+              "    pm.collectionVariables.set('refreshToken', match[1]);",
+              "    console.log('✅ Refresh token saved from cookie');",
+              "  }",
+              "  if (res.data._devVerificationToken) {",
+              "    pm.collectionVariables.set('verificationToken', res.data._devVerificationToken);",
+              "    console.log('✅ Dev verification token saved:', res.data._devVerificationToken);",
+              "  }",
+              "  console.log('✅ Registered as:', res.data.user.email);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/auth/register",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"demo.user@example.com\",\n  \"username\": \"demo_user\",\n  \"password\": \"DemoPass123!\",\n  \"name\": \"Demo User\",\n  \"consentToDataProcessing\": true,\n  \"businessName\": \"Demo Salon\",\n  \"businessType\": \"salon\"\n}"
+        }
+      }
+    },
+    {
+      "name": "2. Verify Email",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Uses the verificationToken saved from Register response",
+              "const token = pm.collectionVariables.get('verificationToken');",
+              "if (!token) console.warn('⚠️  No verificationToken saved — run Register first');",
+              "pm.request.url = pm.request.url.toString().replace(':token', token);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('isEmailVerified is true', () => pm.expect(res.data.user.isEmailVerified).to.be.true);",
+              "console.log('✅ Email verified for:', res.data?.user?.email);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/v1/auth/verify-email/{{verificationToken}}"
+      }
+    },
+    {
+      "name": "3. Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has accessToken', () => pm.expect(res.data).to.have.property('accessToken'));",
+              "pm.test('Message is Login successful', () => pm.expect(res.message).to.equal('Login successful'));",
+              "pm.test('isEmailVerified is true', () => pm.expect(res.data.user.isEmailVerified).to.be.true);",
+              "",
+              "if (res.success) {",
+              "  pm.collectionVariables.set('accessToken', res.data.accessToken);",
+              "  const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+              "  const match = setCookie.match(/refreshToken=([^;]+)/);",
+              "  if (match?.[1]) {",
+              "    pm.collectionVariables.set('refreshToken', match[1]);",
+              "    console.log('✅ Refresh token saved from cookie');",
+              "  }",
+              "  console.log('✅ Logged in, token saved');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"demo.user@example.com\",\n  \"password\": \"DemoPass123!\"\n}"
+        }
+      }
+    },
+    {
+      "name": "4. Get Me",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has user data', () => {",
+              "  const res = pm.response.json();",
+              "  pm.expect(res.data.user).to.have.property('email');",
+              "  pm.expect(res.data.user).to.not.have.property('password');",
+              "  pm.expect(res.data.user).to.not.have.property('refreshTokens');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/auth/me"
+      }
+    },
+    {
+      "name": "5. Get Sessions",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Sessions is array', () => {",
+              "  const res = pm.response.json();",
+              "  pm.expect(res.data.sessions).to.be.an('array');",
+              "  pm.expect(res.data.count).to.be.above(0);",
+              "  console.log('Active sessions:', res.data.count);",
+              "  if (res.data.sessions.length > 0) {",
+              "    const s = res.data.sessions[0];",
+              "    console.log('Last used:', s.lastUsed);",
+              "    console.log('Device:', s.deviceInfo?.userAgent?.substring(0,50));",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/auth/sessions"
+      }
+    },
+    {
+      "name": "6. Refresh Token",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const rt = pm.collectionVariables.get('refreshToken');",
+              "if (rt) {",
+              "  pm.request.headers.upsert({ key: 'x-refresh-token', value: rt });",
+              "} else {",
+              "  console.warn('⚠️  No refreshToken found in collection variables; cookie jar must provide it.');",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has new accessToken', () => pm.expect(res.data).to.have.property('accessToken'));",
+              "",
+              "if (res.success) {",
+              "  pm.collectionVariables.set('accessToken', res.data.accessToken);",
+              "  const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+              "  const match = setCookie.match(/refreshToken=([^;]+)/);",
+              "  if (match?.[1]) {",
+              "    pm.collectionVariables.set('refreshToken', match[1]);",
+              "  }",
+              "  console.log('✅ Token refreshed and rotated');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/v1/auth/refresh",
+        "description": "Cookie is sent automatically by browser/Postman if set.\nIn Postman, enable 'Automatically follow redirects' and cookie jar."
+      }
+    },
+    {
+      "name": "7. Resend Verification",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or 400', () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+              "});",
+              "const res = pm.response.json();",
+              "if (res.data?._devVerificationToken) {",
+              "  pm.collectionVariables.set('verificationToken', res.data._devVerificationToken);",
+              "  console.log('New token saved:', res.data._devVerificationToken);",
+              "} else if (!res.success) {",
+              "  console.log('Note:', res.message);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/v1/auth/resend-verification"
+      }
+    },
+    {
+      "name": "8. Forgot Password",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 (always)', () => pm.response.to.have.status(200));",
+              "pm.test('Same message regardless of email', () => {",
+              "  const res = pm.response.json();",
+              "  pm.expect(res.message).to.include('If that email is registered');",
+              "});",
+              "",
+              "const res = pm.response.json();",
+              "if (res.data?._devResetToken) {",
+              "  pm.collectionVariables.set('resetToken', res.data._devResetToken);",
+              "  console.log('✅ Dev reset token saved:', res.data._devResetToken);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/auth/forgot-password",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"demo.user@example.com\"\n}"
+        }
+      }
+    },
+    {
+      "name": "9. Reset Password",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Success message', () => {",
+              "  const res = pm.response.json();",
+              "  pm.expect(res.message).to.include('reset successful');",
+              "});",
+              "console.log('✅ Password reset. Now login with DemoNewPass123!');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/auth/reset-password",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"password\": \"DemoNewPass123!\",\n  \"confirmPassword\": \"DemoNewPass123!\"\n}"
+        }
+      }
+    },
+    {
+      "name": "10. Change Password",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Success message', () => {",
+              "  const res = pm.response.json();",
+              "  pm.expect(res.message).to.include('changed successfully');",
+              "});",
+              "console.log('✅ Password changed. Re-login required.');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/auth/change-password",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPassword\": \"DemoPass123!\",\n  \"newPassword\": \"DemoChanged123!\",\n  \"confirmPassword\": \"DemoChanged123!\"\n}"
+        }
+      }
+    },
+    {
+      "name": "11. Logout",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('accessToken', '');",
+              "console.log('✅ Logged out, token cleared');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/v1/auth/logout"
+      }
+    },
+    {
+      "name": "12. Logout All Devices",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Must be logged in — run Login first if token is empty",
+              "const token = pm.collectionVariables.get('accessToken');",
+              "if (!token) console.warn('⚠️  No accessToken — run Login first');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('accessToken', '');",
+              "console.log('✅ All sessions invalidated');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/v1/auth/logout-all"
+      }
+    },
+    {
+      "name": "— Error Cases —",
+      "item": [
+        {
+          "name": "Login with wrong password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Shows remaining attempts', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.message).to.include('attempt');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo.user@example.com\",\n  \"password\": \"DemoWrongPass1!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register with duplicate email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Error message mentions Email', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.message).to.include('Email');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo.user@example.com\",\n  \"username\": \"another_demo_user\",\n  \"password\": \"DemoPass123!\",\n  \"name\": \"Demo User\",\n  \"consentToDataProcessing\": true,\n  \"businessName\": \"Another Demo Salon\",\n  \"businessType\": \"salon\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get /me without token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error message', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.message).to.include('token');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/me"
+          }
+        },
+        {
+          "name": "Change password — current is wrong",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error mentions incorrect', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.message).to.include('incorrect');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/change-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"DemoWrongCurrent1!\",\n  \"newPassword\": \"DemoNewPass999!\",\n  \"confirmPassword\": \"DemoNewPass999!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reset password — invalid token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions invalid or expired', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.message).to.include('invalid or has expired');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef\",\n  \"password\": \"DemoNewPass123!\",\n  \"confirmPassword\": \"DemoNewPass123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Validation — weak password (no uppercase)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('Error mentions uppercase', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.message.toLowerCase()).to.include('uppercase');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"weak.user@example.com\",\n  \"username\": \"weak_user\",\n  \"password\": \"nouppercasenum1\",\n  \"name\": \"Weak Demo User\",\n  \"consentToDataProcessing\": true,\n  \"businessName\": \"Weak Demo Biz\",\n  \"businessType\": \"salon\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
