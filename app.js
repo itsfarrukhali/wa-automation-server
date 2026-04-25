@@ -95,11 +95,25 @@ app.use("/api/v1/auth", userRouter);
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error("Unhandled error:", err);
-  const statusCode = err?.isOperational ? err.statusCode || 500 : 500;
+  let statusCode = err?.isOperational ? err.statusCode || 500 : 500;
+  let message = err.message || "Internal server error";
+
+  // Treat Mongoose validation failures as user-caused 4xx errors.
+  if (err?.name === "ValidationError") {
+    statusCode = 400;
+
+    const validationMessages = Object.values(err.errors || {})
+      .map((validationErr) => validationErr?.message)
+      .filter(Boolean);
+
+    if (validationMessages.length > 0) {
+      message = validationMessages.join(", ");
+    }
+  }
 
   res.status(statusCode).json({
     success: false,
-    message: err.message || "Internal server error",
+    message,
   });
 });
 

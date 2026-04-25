@@ -289,7 +289,7 @@ const shell = (headerColor, headerIcon, headerTitle, bodyHtml) => `
  * @param {string} rawToken   - raw (un-hashed) token returned by generateEmailVerificationToken()
  */
 export const sendVerificationEmail = async (email, fullName, rawToken) => {
-  const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${rawToken}`;
+  const verificationUrl = `${env.CLIENT_URL}/verify-email?token=${rawToken}`;
 
   const body = `
     <p class="greeting">Hello ${fullName}! 👋</p>
@@ -339,7 +339,7 @@ export const sendVerificationEmail = async (email, fullName, rawToken) => {
  * @param {string} username
  */
 export const sendWelcomeEmail = async (email, fullName, username) => {
-  const dashboardUrl = `${env.FRONTEND_URL}/dashboard`;
+  const dashboardUrl = `${env.CLIENT_URL}/dashboard`;
 
   const body = `
     <p class="greeting">Welcome aboard, ${fullName}! 🎉</p>
@@ -389,7 +389,7 @@ export const sendWelcomeEmail = async (email, fullName, username) => {
  * @param {string} rawToken
  */
 export const sendPasswordResetEmail = async (email, fullName, rawToken) => {
-  const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${rawToken}`;
+  const resetUrl = `${env.CLIENT_URL}/reset-password?token=${rawToken}`;
   const name = fullName || "there";
 
   const body = `
@@ -440,7 +440,7 @@ export const sendPasswordResetEmail = async (email, fullName, rawToken) => {
  */
 
 export const sendPasswordChangedEmail = async (email, fullName) => {
-  const loginUrl = `${env.FRONTEND_URL}/login`;
+  const loginUrl = `${env.CLIENT_URL}/login`;
   const supportUrl = "mailto:support@zario.app";
 
   const body = `
@@ -458,7 +458,9 @@ export const sendPasswordChangedEmail = async (email, fullName) => {
 
     <p>
       All active sessions have been logged out for your security.
-      Log back in with your new password:
+      If this wasn't you, please
+      <a href="${supportUrl}" style="font-weight:bold;">contact support immediately</a>.
+      You can log back in with your new password here:
     </p>
 
     <div class="btn-wrap">

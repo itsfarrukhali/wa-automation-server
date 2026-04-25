@@ -11,6 +11,7 @@
 
 import { body, validationResult } from "express-validator";
 import ApiResponseUtil from "../helpers/apiResponse.utils.js";
+import Category from "../../models/common/categorySchema.js";
 
 // Generic Validation Runner
 
@@ -71,6 +72,27 @@ export const registerValidator = [
     .withMessage("Name is required")
     .isLength({ max: 100 })
     .withMessage("Name cannot exceed 100 characters"),
+
+  body("businessName")
+    .trim()
+    .notEmpty()
+    .withMessage("Business name is required")
+    .isLength({ min: 2 })
+    .withMessage("Business name must be at least 2 characters")
+    .isLength({ max: 150 })
+    .withMessage("Business name cannot exceed 150 characters"),
+
+  body("businessType")
+    .trim()
+    .notEmpty()
+    .withMessage("Business type is required")
+    .custom(async (val) => {
+      const category = await Category.findOne({ name: val, isActive: true });
+      if (!category) {
+        throw new Error("Invalid business type");
+      }
+      return true;
+    }),
 
   body("consentToDataProcessing")
     .notEmpty()

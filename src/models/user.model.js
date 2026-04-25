@@ -232,7 +232,16 @@ userSchema.pre("save", async function () {
     for (const oldHash of this.passwordHistory.slice(-3)) {
       const isReused = await bcrypt.compare(this.password, oldHash);
       if (isReused) {
-        throw new Error("Cannot reuse your last 3 passwords");
+        const validationError = new mongoose.Error.ValidationError(this);
+        validationError.addError(
+          "password",
+          new mongoose.Error.ValidatorError({
+            path: "password",
+            message: "Cannot reuse your last 3 passwords",
+            value: this.password,
+          }),
+        );
+        throw validationError;
       }
     }
   }

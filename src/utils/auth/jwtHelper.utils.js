@@ -3,7 +3,7 @@
  *
  * Pure utility — only signs and verifies tokens.
  * Token GENERATION lives on the User model methods:
- *   user.generateAuthToken()       → uses JWT_SECRET + JWT_EXPIRES_IN
+ *   user.generateAuthToken()       → uses JWT_ACCESS_SECRET + JWT_EXPIRES_IN
  *   user.generateRefreshToken()    → uses JWT_REFRESH_SECRET + REFRESH_TOKEN_EXPIRY_DAYS
  *
  * This file handles VERIFICATION and cookie config only.
@@ -48,7 +48,7 @@ const REFRESH_EXPIRY_DAYS = parseInt(env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
  * - httpOnly: JS cannot read it → XSS-safe
  * - secure: HTTPS only in production
  * - sameSite: CSRF mitigation
- * - path: Scoped to /api/auth so cookie isn't sent on every request
+ * - path: Scoped to /api/v1/auth so cookie isn't sent on every request
  */
 
 export const refreshCookieOptions = {

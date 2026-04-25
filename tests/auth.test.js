@@ -116,6 +116,11 @@ before(async () => {
   process.env.CLIENT_URL = "http://localhost:5173";
   process.env.GMAIL_USER = "noreply@example.com";
   process.env.GMAIL_APP_PASSWORD = "fake-app-password";
+  process.env.MONGODB_URI = process.env.MONGODB_URI || "mongodb://test";
+  process.env.WA_TOKEN = "test_wa_token";
+  process.env.WA_PHONE_ID = "test_phone_id";
+  process.env.WEBHOOK_VERIFY_TOKEN = "test_webhook_verify_token";
+  process.env.WHATSAPP_ENCRYPTION_KEY = "test_encryption_key";
 
   // Import the Express app after env is set.
   // Do not import server.js in tests because it starts the HTTP listener.
@@ -705,8 +710,8 @@ describe("POST /api/v1/auth/reset-password", () => {
       confirmPassword: "Test1234!",
     });
 
-    // The pre-save hook throws "Cannot reuse your last 3 passwords"
-    expect(res.status).to.be.oneOf([400, 500]); // model error propagates
+    expect(res.status).to.equal(400);
+    expect(res.body.message).to.include("Cannot reuse your last 3 passwords");
   });
 
   it("422 — passwords don't match", async () => {

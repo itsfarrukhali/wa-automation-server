@@ -364,7 +364,7 @@ export const resetPassword = async (rawToken, newPassword) => {
     resetPasswordToken: hashedToken,
     resetPasswordExpiry: { $gt: Date.now() },
   }).select(
-    "+password +passwordHistory +resetPasswordToken +resetPasswordExpiry +refreshTokens",
+    "+password +passwordHistory +resetPasswordToken +resetPasswordExpiry +refreshTokens +tokenVersion",
   );
 
   if (!user) {
@@ -380,9 +380,10 @@ export const resetPassword = async (rawToken, newPassword) => {
   user.resetPasswordToken = undefined;
   user.resetPasswordExpiry = undefined;
 
-  // Security: clear all sessions after password reset
+  // Security: invalidate every active session after password reset.
   user.refreshTokens = [];
   user.markModified("refreshTokens");
+  user.tokenVersion = (user.tokenVersion || 1) + 1;
 
   await user.save();
 
@@ -398,7 +399,7 @@ export const resetPassword = async (rawToken, newPassword) => {
 
 export const changePassword = async (userId, currentPassword, newPassword) => {
   const user = await User.findById(userId).select(
-    "+password +passwordHistory +refreshTokens",
+    "+password +passwordHistory +refreshTokens +tokenVersion",
   );
 
   if (!user) throw new AppError("User not found", 404);
@@ -409,8 +410,11 @@ export const changePassword = async (userId, currentPassword, newPassword) => {
   // Pre-save hook will reject if newPassword matches last 3 hashes
   user.password = newPassword;
 
-  // Clear other sessions — user stays logged in on current device
-  // (caller removes only the current token from the cookie response)
+  // Security: invalidate every active session after password change.
+  user.refreshTokens = [];
+  user.markModified("refreshTokens");
+  user.tokenVersion = (user.tokenVersion || 1) + 1;
+
   await user.save();
 
   return user;

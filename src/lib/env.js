@@ -31,6 +31,7 @@ export const env = {
   WA_TOKEN: required("WA_TOKEN"),
   WA_PHONE_ID: required("WA_PHONE_ID"),
   WEBHOOK_VERIFY_TOKEN: required("WEBHOOK_VERIFY_TOKEN"),
+  WHATSAPP_ENCRYPTION_KEY: required("WHATSAPP_ENCRYPTION_KEY"),
 
   // Frontend URL for CORS
   CLIENT_URL: optional("CLIENT_URL", "http://localhost:5173"),

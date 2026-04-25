@@ -7,7 +7,7 @@
  *   3. [middleware]     — verifyToken where route is protected
  *   4. controller       — asyncHandler-wrapped business logic
  *
- * All routes under /api/auth/v1
+ *  All routes under /api/v1/auth
  */
 
 import { Router } from "express";

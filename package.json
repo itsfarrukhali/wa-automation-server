@@ -8,9 +8,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "seed": "node seed/categories.js",
+    "seed": "node seed/index.js",
     "dev": "nodemon --legacy-watch server.js",
-    "test": "mocha --experimental-vm-modules --timeout 15000 --exit"
+    "test": "mocha --experimental-vm-modules --timeout 15000 --exit \"tests/**/*.js\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
