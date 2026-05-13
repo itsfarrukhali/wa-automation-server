@@ -1,0 +1,1263 @@
+{
+  "info": {
+    "name": "Zario — Business Module",
+    "_postman_id": "zario-business-v1",
+    "description": "Business module API tests for Zario.\n\nPrerequisite: Run the Auth collection first to get a valid accessToken stored in the 'zario_access_token' collection variable.\n\nAll requests use {{baseUrl}} and {{zario_access_token}} — set these in your Zario environment.\n\nOnboarding flow order: Step 1 → 2 → 3 → 4 → 5 (must run in sequence).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "zario_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "business_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "── READ ──",
+      "item": [
+        {
+          "name": "GET My Business",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "me"
+              ]
+            },
+            "description": "Returns the full business profile for the authenticated owner."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has business object', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data.business).to.be.an('object');",
+                  "  pm.expect(body.data.business).to.have.property('name');",
+                  "  pm.expect(body.data.business).to.have.property('type');",
+                  "  pm.expect(body.data.business).to.have.property('onboardingStep');",
+                  "});",
+                  "",
+                  "// Save business ID for admin tests later",
+                  "const biz = pm.response.json().data?.business;",
+                  "if (biz?._id) pm.collectionVariables.set('business_id', biz._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Onboarding Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "status"
+              ]
+            },
+            "description": "Returns per-step completion state for the frontend stepper UI."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Has steps array with 5 items', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.steps).to.be.an('array').with.lengthOf(5);",
+                  "});",
+                  "",
+                  "pm.test('Each step has required fields', () => {",
+                  "  const steps = pm.response.json().data.steps;",
+                  "  steps.forEach(s => {",
+                  "    pm.expect(s).to.have.all.keys('step', 'label', 'completed', 'current');",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "dashboard"
+              ]
+            },
+            "description": "Aggregated stats for the dashboard home screen."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Has all dashboard sections', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data).to.have.property('business');",
+                  "  pm.expect(data).to.have.property('plan');",
+                  "  pm.expect(data).to.have.property('customers');",
+                  "  pm.expect(data).to.have.property('bookings');",
+                  "  pm.expect(data).to.have.property('messages');",
+                  "});",
+                  "",
+                  "pm.test('Plan has usage info', () => {",
+                  "  const plan = pm.response.json().data.plan;",
+                  "  pm.expect(plan).to.have.property('current');",
+                  "  pm.expect(plan).to.have.property('messagesUsed');",
+                  "  pm.expect(plan).to.have.property('messagesLimit');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Plan Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "plan"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Plan has limits and usage percentages', () => {",
+                  "  const plan = pm.response.json().data.plan;",
+                  "  pm.expect(plan).to.have.property('limits');",
+                  "  pm.expect(plan).to.have.property('usage');",
+                  "  pm.expect(plan.usage).to.have.property('messageUsagePct');",
+                  "  pm.expect(plan.usage).to.have.property('customerUsagePct');",
+                  "  pm.expect(plan.usage.messageUsagePct).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "── ONBOARDING ──",
+      "item": [
+        {
+          "name": "PATCH Step 1 — Basic Info ✓",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Glamour Hair Studio\",\n  \"type\": \"salon\",\n  \"phone\": \"03001234567\",\n  \"email\": \"glamour@studio.pk\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/step-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "step-1"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Business name updated', () => {",
+                  "  const biz = pm.response.json().data.business;",
+                  "  pm.expect(biz.name).to.eql('Glamour Hair Studio');",
+                  "  pm.expect(biz.phone).to.eql('03001234567');",
+                  "});",
+                  "",
+                  "pm.test('nextStep is 2', () => {",
+                  "  pm.expect(pm.response.json().data.nextStep).to.eql(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Step 1 — Validation: invalid phone ✗",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/step-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "step-1"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 for invalid phone', () => pm.response.to.have.status(422));",
+                  "",
+                  "pm.test('Error mentions phone', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  const phoneError = body.error?.find(e => e.field === 'phone');",
+                  "  pm.expect(phoneError).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Step 2 — Location ✓",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"city\": \"Karachi\",\n  \"area\": \"DHA Phase 6\",\n  \"address\": \"Main Bukhari Commercial, Lane 5\",\n  \"location\": {\n    \"lat\": 24.8607,\n    \"lng\": 67.0011\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/step-2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "step-2"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Location fields saved', () => {",
+                  "  const biz = pm.response.json().data.business;",
+                  "  pm.expect(biz.city).to.eql('Karachi');",
+                  "  pm.expect(biz.area).to.eql('DHA Phase 6');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Step 2 — Validation: invalid lat ✗",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"location\": { \"lat\": 999, \"lng\": 67 }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/step-2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "step-2"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 for invalid latitude', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Step 3 — Working Hours ✓",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workingHours\": [\n    { \"day\": \"mon\", \"isOpen\": true, \"openTime\": \"10:00\", \"closeTime\": \"20:00\" },\n    { \"day\": \"tue\", \"isOpen\": true, \"openTime\": \"10:00\", \"closeTime\": \"20:00\" },\n    { \"day\": \"wed\", \"isOpen\": true, \"openTime\": \"10:00\", \"closeTime\": \"20:00\" },\n    { \"day\": \"thu\", \"isOpen\": true, \"openTime\": \"10:00\", \"closeTime\": \"20:00\" },\n    { \"day\": \"fri\", \"isOpen\": true, \"openTime\": \"10:00\", \"closeTime\": \"18:00\" },\n    { \"day\": \"sat\", \"isOpen\": true, \"openTime\": \"11:00\", \"closeTime\": \"17:00\" },\n    { \"day\": \"sun\", \"isOpen\": false, \"openTime\": \"09:00\", \"closeTime\": \"18:00\" }\n  ],\n  \"timezone\": \"Asia/Karachi\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/step-3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "step-3"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('All 7 days saved', () => {",
+                  "  const biz = pm.response.json().data.business;",
+                  "  pm.expect(biz.workingHours).to.have.lengthOf(7);",
+                  "});",
+                  "",
+                  "pm.test('Sunday is closed', () => {",
+                  "  const sun = pm.response.json().data.business.workingHours.find(h => h.day === 'sun');",
+                  "  pm.expect(sun.isOpen).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Step 3 — Validation: invalid day name ✗",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workingHours\": [\n    { \"day\": \"monday\", \"isOpen\": true, \"openTime\": \"09:00\", \"closeTime\": \"18:00\" }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/step-3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "step-3"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 for invalid day', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Step 4 — Engagement Settings ✓",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reminderTime\": 24,\n  \"followUpDays\": 3,\n  \"winbackDays\": 45,\n  \"reviewRequestEnabled\": true,\n  \"reviewPlatform\": \"google\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/step-4",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "step-4"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Engagement settings saved', () => {",
+                  "  const eng = pm.response.json().data.business.engagement;",
+                  "  pm.expect(eng.reminderTime).to.eql(24);",
+                  "  pm.expect(eng.winbackDays).to.eql(45);",
+                  "  pm.expect(eng.reviewPlatform).to.eql('google');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Step 4 — Validation: reminderTime out of range ✗",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reminderTime\": 200\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/step-4",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "step-4"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 for out-of-range reminderTime', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Step 5 — WhatsApp Connect ✓ (completes onboarding)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumberId\": \"123456789012345\",\n  \"wabaId\": \"987654321098765\",\n  \"displayPhoneNumber\": \"+923001234567\",\n  \"verifiedName\": \"Glamour Hair Studio\",\n  \"accessToken\": \"EAABwzLixnjY...\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/step-5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "step-5"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Onboarding is now complete', () => {",
+                  "  const biz = pm.response.json().data.business;",
+                  "  pm.expect(biz.onboardingComplete).to.be.true;",
+                  "  pm.expect(biz.whatsappVerified).to.be.true;",
+                  "  pm.expect(biz.whatsapp.connectionStatus).to.eql('connected');",
+                  "});",
+                  "",
+                  "pm.test('accessToken is NOT exposed in response', () => {",
+                  "  const biz = pm.response.json().data.business;",
+                  "  pm.expect(biz.whatsapp?.accessToken).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Step 5 — Validation: missing phoneNumberId ✗",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wabaId\": \"987654321\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/onboarding/step-5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "onboarding",
+                "step-5"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 for missing phoneNumberId', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "── PROFILE & SETTINGS ──",
+      "item": [
+        {
+          "name": "PATCH Update Profile ✓",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Glamour Hair Studio (Updated)\",\n  \"phone\": \"03211234567\",\n  \"email\": \"updated@glamour.pk\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "profile"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Name updated', () => {",
+                  "  pm.expect(pm.response.json().data.business.name).to.include('Updated');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Update Profile — invalid logo URL ✗",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"logo\": \"not-a-url\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "profile"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 for invalid logo URL', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Update Settings ✓",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notifications\": {\n    \"email\": true,\n    \"whatsapp\": false\n  },\n  \"language\": \"en\",\n  \"currency\": \"PKR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "settings"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Settings updated', () => {",
+                  "  const settings = pm.response.json().data.business.settings;",
+                  "  pm.expect(settings.language).to.eql('en');",
+                  "  pm.expect(settings.notifications.whatsapp).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Update Settings — invalid language ✗",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language\": \"fr\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "settings"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 for unsupported language', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Working Hours — Single Day (fri) ✓",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isOpen\": true,\n  \"openTime\": \"11:00\",\n  \"closeTime\": \"15:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/working-hours/fri",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "working-hours",
+                "fri"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Friday hours updated', () => {",
+                  "  const fri = pm.response.json().data.business.workingHours.find(h => h.day === 'fri');",
+                  "  pm.expect(fri.openTime).to.eql('11:00');",
+                  "  pm.expect(fri.closeTime).to.eql('15:00');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Working Hours — invalid day param ✗",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isOpen\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/working-hours/friday",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "working-hours",
+                "friday"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 for invalid day param', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH Update Engagement (post-onboarding) ✓",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"winbackDays\": 60,\n  \"reviewPlatform\": \"facebook\",\n  \"reviewRequestEnabled\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/engagement",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "engagement"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Engagement updated', () => {",
+                  "  const eng = pm.response.json().data.business.engagement;",
+                  "  pm.expect(eng.winbackDays).to.eql(60);",
+                  "  pm.expect(eng.reviewPlatform).to.eql('facebook');",
+                  "  pm.expect(eng.reviewRequestEnabled).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "── SECURITY ──",
+      "item": [
+        {
+          "name": "GET My Business — no token ✗",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 without token', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET My Business — malformed token ✗",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer this.is.not.valid"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/business/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "business",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 for malformed token', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "── ADMIN ──",
+      "item": [
+        {
+          "name": "GET List All Businesses ✓",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/businesses?page=1&limit=10&isActive=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "businesses"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Requires role: admin. Returns paginated list with filters."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// NOTE: This will return 403 unless your test user has role='admin'",
+                  "// Manually set the role in MongoDB for this test",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Has businesses array and pagination', () => {",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.businesses).to.be.an('array');",
+                  "    pm.expect(data.pagination).to.have.property('total');",
+                  "    pm.expect(data.pagination).to.have.property('pages');",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Non-admin gets 403', () => pm.response.to.have.status(403));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST Upgrade Plan ✓",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{business_id}}\",\n  \"newPlan\": \"starter\",\n  \"paymentMethod\": \"jazzcash\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/businesses/upgrade-plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "businesses",
+                "upgrade-plan"
+              ]
+            },
+            "description": "Requires role: admin. business_id is auto-set by the GET My Business test."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Plan upgraded to starter', () => {",
+                  "    const biz = pm.response.json().data.business;",
+                  "    pm.expect(biz.plan.currentPlan).to.eql('starter');",
+                  "    pm.expect(biz.plan.isTrial).to.be.false;",
+                  "    pm.expect(biz.plan.paymentMethod).to.eql('jazzcash');",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Non-admin gets 403', () => pm.response.to.have.status(403));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST Upgrade Plan — invalid plan name ✗",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zario_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{business_id}}\",\n  \"newPlan\": \"ultra_premium\",\n  \"paymentMethod\": \"jazzcash\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/businesses/upgrade-plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "businesses",
+                "upgrade-plan"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 for invalid plan name', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

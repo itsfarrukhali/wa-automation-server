@@ -4,6 +4,10 @@ import cookieParser from "cookie-parser";
 import ApiResponseUtil from "./src/utils/helpers/apiResponse.utils.js";
 import { env } from "./src/lib/env.js";
 import userRouter from "./src/routes/api/v1/auth.routes.js";
+import businessRouter from "./src/routes/api/v1/business.routes.js";
+import adminRouter, {
+  superAdminRouter,
+} from "./src/routes/api/v1/admin.routes.js";
 
 const app = express();
 
@@ -91,6 +95,9 @@ app.get("/api/health", (_req, res) => {
 
 // API Routes
 app.use("/api/v1/auth", userRouter);
+app.use("/api/v1/business", businessRouter);
+app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/superadmin", superAdminRouter);
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
