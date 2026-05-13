@@ -22,17 +22,38 @@ import { AppError } from "../utils/helpers/errorHandler.utils.js";
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 /**
- * Load the business that belongs to the authenticated user.
+ * Load the active business associated with the authenticated user.
+ * Supports both business owners and staff members.
  * Throws 404 if not found — used by almost every service function.
  *
  * @param {string} userId
  * @param {string} [selectFields] - Additional fields to select (e.g. "+whatsapp.accessToken")
  */
 const getOwnedBusiness = async (userId, selectFields = "") => {
-  const query = Business.findOne({ ownerId: userId, isActive: true });
-  if (selectFields) query.select(selectFields);
+  const applySelect = (query) => {
+    if (selectFields) query.select(selectFields);
+    return query;
+  };
 
-  const business = await query;
+  let business = await applySelect(
+    Business.findOne({ ownerId: userId, isActive: true }),
+  );
+
+  if (!business) {
+    const user = await User.findById(userId).select("businessId");
+    if (user?.businessId) {
+      business = await applySelect(
+        Business.findOne({ _id: user.businessId, isActive: true }),
+      );
+    }
+  }
+
+  if (!business) {
+    business = await applySelect(
+      Business.findOne({ staffIds: userId, isActive: true }),
+    );
+  }
+
   if (!business) {
     throw new AppError(
       "Business not found. Complete your registration to continue.",
@@ -91,13 +112,18 @@ export const getOnboardingStatus = async (userId) => {
   const steps = [1, 2, 3, 4, 5].map((n) => ({
     step: n,
     label: stepLabels[n],
-    completed: n < business.onboardingStep,
-    current: n === business.onboardingStep,
+    completed: n <= business.onboardingStep,
+    current:
+      !business.onboardingComplete && n === Math.min(business.onboardingStep + 1, 5),
   }));
+
+  const currentStep = business.onboardingComplete
+    ? 5
+    : Math.min(business.onboardingStep + 1, 5);
 
   return {
     onboardingComplete: business.onboardingComplete,
-    currentStep: business.onboardingStep,
+    currentStep,
     steps,
     businessId: business._id,
     businessName: business.name,
@@ -245,6 +271,32 @@ export const completeStep5WhatsApp = async (userId, data) => {
     // Store as a JSON string because the schema expects a String field.
     // TODO: In production, adjust the schema to have separate iv/tag fields for cleaner handling.
     business.whatsapp.accessToken = JSON.stringify(encrypted);
+
+    // Derive token expiry if available; prefer explicit fields, then JWT 'exp',
+    // otherwise fall back to a long default (1 year) so isConnected() can work.
+    let expiresAt = null;
+    if (typeof accessToken === "object") {
+      if (accessToken.expires_at) expiresAt = new Date(accessToken.expires_at);
+      else if (accessToken.expiresIn) expiresAt = new Date(Date.now() + Number(accessToken.expiresIn) * 1000);
+      else if (accessToken.expiresInSeconds)
+        expiresAt = new Date(Date.now() + Number(accessToken.expiresInSeconds) * 1000);
+    } else if (typeof accessToken === "string") {
+      // Try to decode JWT payload to read `exp` claim
+      try {
+        const parts = accessToken.split(".");
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
+          if (payload.exp) expiresAt = new Date(payload.exp * 1000);
+        }
+      } catch (e) {
+        // ignore parse errors
+      }
+    }
+
+    if (!expiresAt) {
+      expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // default 1 year
+    }
+    business.whatsapp.tokenExpiresAt = expiresAt;
   }
 
   business.whatsapp.connectionStatus = "connected";

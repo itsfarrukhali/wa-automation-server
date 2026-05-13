@@ -952,11 +952,13 @@ describe("Admin Module", function () {
         .get("/api/v1/superadmin/admins")
         .set("Authorization", `Bearer ${superAdminToken}`);
 
-      const allAdmins = res.body.data.admins.every(
-        (u) => u.role === undefined || true,
-      );
-      // Note: listAdmins select doesn't include role field — confirm it's not superadmin
       expect(res.body.data.admins).to.be.an("array");
+      expect(res.body.data.admins).to.have.length.greaterThan(0);
+      expect(res.body.data.admins.map((u) => u.username)).to.include(
+        admin.username,
+      );
+      expect(res.body.data.admins.some((u) => u.username === superAdmin.username))
+        .to.be.false;
     });
 
     it("pagination params respected", async () => {

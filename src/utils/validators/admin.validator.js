@@ -130,7 +130,7 @@ export const businessIdParamValidator = [
 
 export const setActiveStatusValidator = [
   body("isActive")
-    .notEmpty()
+    .exists()
     .withMessage("isActive is required")
     .isBoolean()
     .withMessage("isActive must be a boolean"),
@@ -205,7 +205,7 @@ export const forceAdvanceOnboardingValidator = [
 
 export const setVerifiedValidator = [
   body("isVerified")
-    .notEmpty()
+    .exists()
     .withMessage("isVerified is required")
     .isBoolean()
     .withMessage("isVerified must be a boolean"),

@@ -1177,10 +1177,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"businessId\": \"{{business_id}}\",\n  \"newPlan\": \"starter\",\n  \"paymentMethod\": \"jazzcash\"\n}"
+              "raw": "{\n  \"newPlan\": \"starter\",\n  \"paymentMethod\": \"jazzcash\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/businesses/upgrade-plan",
+              "raw": "{{baseUrl}}/api/v1/admin/businesses/{{business_id}}/upgrade-plan",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1189,10 +1189,11 @@
                 "v1",
                 "admin",
                 "businesses",
+                "{{business_id}}",
                 "upgrade-plan"
               ]
             },
-            "description": "Requires role: admin. business_id is auto-set by the GET My Business test."
+            "description": "Requires role: admin. business_id is auto-set by the GET My Business test and is now sent as a path param."
           },
           "event": [
             {
@@ -1230,10 +1231,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"businessId\": \"{{business_id}}\",\n  \"newPlan\": \"ultra_premium\",\n  \"paymentMethod\": \"jazzcash\"\n}"
+              "raw": "{\n  \"newPlan\": \"ultra_premium\",\n  \"paymentMethod\": \"jazzcash\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/businesses/upgrade-plan",
+              "raw": "{{baseUrl}}/api/v1/admin/businesses/{{business_id}}/upgrade-plan",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1242,6 +1243,7 @@
                 "v1",
                 "admin",
                 "businesses",
+                "{{business_id}}",
                 "upgrade-plan"
               ]
             }

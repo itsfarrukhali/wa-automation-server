@@ -139,6 +139,25 @@ describe("BusinessService.getMyBusiness", () => {
     assert.equal(result.name, "Test Salon");
   });
 
+  it("returns the business for a staff member linked by businessId", async () => {
+    const { business } = await seedUserAndBusiness();
+    const staff = await User.create({
+      email: "staff@test.com",
+      username: "staffuser",
+      password: "Password123!",
+      name: "Staff Member",
+      isEmailVerified: true,
+      consentToDataProcessing: true,
+      role: "staff",
+      businessId: business._id,
+    });
+
+    const result = await BusinessService.getMyBusiness(staff._id.toString());
+
+    assert.equal(result._id.toString(), business._id.toString());
+    assert.equal(result.name, "Test Salon");
+  });
+
   it("throws 404 when user has no business", async () => {
     const user = await User.create({
       email: "nobiz@test.com",
@@ -178,20 +197,23 @@ describe("BusinessService.getMyBusiness", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("BusinessService.getOnboardingStatus", () => {
-  it("returns correct step state for a fresh business (step 1)", async () => {
+  it("returns correct step state after completing step 1", async () => {
     const { user } = await seedUserAndBusiness({ onboardingStep: 1 });
 
     const status = await BusinessService.getOnboardingStatus(
       user._id.toString(),
     );
 
-    assert.equal(status.currentStep, 1);
+    assert.equal(status.currentStep, 2);
     assert.equal(status.onboardingComplete, false);
     assert.equal(status.steps.length, 5);
 
     const step1 = status.steps.find((s) => s.step === 1);
-    assert.equal(step1.current, true);
-    assert.equal(step1.completed, false);
+    const step2 = status.steps.find((s) => s.step === 2);
+    assert.equal(step1.current, false);
+    assert.equal(step1.completed, true);
+    assert.equal(step2.current, true);
+    assert.equal(step2.completed, false);
   });
 
   it("marks previous steps as completed", async () => {
@@ -204,11 +226,13 @@ describe("BusinessService.getOnboardingStatus", () => {
     const step1 = status.steps.find((s) => s.step === 1);
     const step2 = status.steps.find((s) => s.step === 2);
     const step3 = status.steps.find((s) => s.step === 3);
+    const step4 = status.steps.find((s) => s.step === 4);
 
     assert.equal(step1.completed, true);
     assert.equal(step2.completed, true);
-    assert.equal(step3.current, true);
-    assert.equal(step3.completed, false);
+    assert.equal(step3.completed, true);
+    assert.equal(step4.current, true);
+    assert.equal(step4.completed, false);
   });
 });
 

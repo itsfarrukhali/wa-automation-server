@@ -108,7 +108,7 @@ export const step3Validator = [
     .withMessage(`day must be one of: ${VALID_DAYS.join(", ")}`),
 
   body("workingHours.*.isOpen")
-    .notEmpty()
+    .exists()
     .withMessage("isOpen is required")
     .isBoolean()
     .withMessage("isOpen must be a boolean"),

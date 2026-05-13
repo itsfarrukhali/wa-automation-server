@@ -48,14 +48,14 @@
   ],
   "item": [
     {
-      "name": "⚠️ FIX REQUIRED — Read Before Testing",
+      "name": "⚠️ Read Before Testing",
       "item": [
         {
-          "name": "0.0 Route Conflict Warning (READ THIS)",
+          "name": "0.0 Setup Note (READ THIS)",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/health",
-            "description": "# Route Conflict — Fix app.js Before Testing\n\nYour current app.js has a conflict:\n\n```\napp.use('/api/v1/admin/businesses', adminBusinessRouter);  ← OLD (line 101)\napp.use('/api/v1/admin', adminRouter);                    ← NEW (line 102)\n```\n\nThe old `adminBusinessRouter` from `business.routes.js` is still mounted. Express will hit it FIRST for `/api/v1/admin/businesses`, shadowing the new admin routes.\n\n## Fix — 2 steps:\n\n**Step 1:** In `app.js`, remove line 101:\n```js\n// DELETE this line:\napp.use('/api/v1/admin/businesses', adminBusinessRouter);\n\n// DELETE the import too (lines 7-9):\nimport businessRouter, {\n  adminBusinessRouter,          // ← remove this\n} from './src/routes/api/v1/business.routes.js';\n```\n\n**Step 2:** In `business.routes.js`, delete the block at the bottom (lines 81-94):\n```js\n// DELETE everything below:\nexport const adminBusinessRouter = Router();\nadminBusinessRouter.use(verifyToken, requireAdmin);\nadminBusinessRouter.get('/', ...);\nadminBusinessRouter.post('/upgrade-plan', ...);\n```\n\nAfter this fix, all admin business routes are handled exclusively by `admin.routes.js`. Restart the server, then run the tests below."
+            "description": "# Setup Note\n\nThis collection assumes the application's current admin routing is already correctly configured.\n\nNo manual route deletion or `app.js` / `business.routes.js` cleanup is required before running these requests.\n\nIf your server is running, proceed with the **0. Setup — Login as All Roles** folder first. That step stores the tokens and IDs used by the remaining admin tests.\n\nIf any admin-business endpoints fail, verify that your local backend matches the current project code and that `/api/v1/admin` routes are enabled."
           },
           "response": []
         }

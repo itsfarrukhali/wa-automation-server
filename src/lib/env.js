@@ -49,8 +49,8 @@ export const env = {
   EMAIL_FROM: optional("EMAIL_FROM"),
 
   // Super Admin seeding
-  SUPERADMIN_EMAIL: required("SUPERADMIN_EMAIL"),
-  SUPERADMIN_PASSWORD: required("SUPERADMIN_PASSWORD"),
+  SUPERADMIN_EMAIL: optional("SUPERADMIN_EMAIL"),
+  SUPERADMIN_PASSWORD: optional("SUPERADMIN_PASSWORD"),
   SUPERADMIN_NAME: optional("SUPERADMIN_NAME", "Zario Super Admin"),
   SUPERADMIN_USERNAME: optional("SUPERADMIN_USERNAME", "superadmin"),
 };
