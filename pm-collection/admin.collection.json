@@ -1,0 +1,1790 @@
+{
+  "info": {
+    "name": "Zario — Admin Phase",
+    "description": "Complete test suite for the Admin module.\n\n## Setup\n1. Set `baseUrl` variable to your server (e.g. http://localhost:5000)\n2. Run the **0. Seed / Login** folder first — it populates `superAdminToken`, `adminToken`, `ownerToken`, and stores IDs you need for the other tests.\n3. Run folders in order: Superadmin → Admin → Privilege Guards.\n\n## Variables used\n- `baseUrl`         — server root\n- `superAdminToken` — access token from superadmin login\n- `adminToken`      — access token from admin login\n- `ownerToken`      — access token from owner login\n- `createdAdminId`  — ID of the admin created by superadmin\n- `createdAdminEmail`\n- `targetUserId`    — owner user ID used in user-management tests\n- `targetBusinessId`— business ID used in business-management tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "superAdminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ownerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "createdAdminId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "createdAdminEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "targetUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "targetBusinessId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "⚠️ Read Before Testing",
+      "item": [
+        {
+          "name": "0.0 Setup Note (READ THIS)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "# Setup Note\n\nThis collection assumes the application's current admin routing is already correctly configured.\n\nNo manual route deletion or `app.js` / `business.routes.js` cleanup is required before running these requests.\n\nIf your server is running, proceed with the **0. Setup — Login as All Roles** folder first. That step stores the tokens and IDs used by the remaining admin tests.\n\nIf any admin-business endpoints fail, verify that your local backend matches the current project code and that `/api/v1/admin` routes are enabled."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "0. Setup — Login as All Roles",
+      "description": "Run these first. They store tokens and IDs into collection variables for all subsequent tests.",
+      "item": [
+        {
+          "name": "0.1 Login as Superadmin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns access token', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data.accessToken).to.be.a('string');",
+                  "  pm.expect(body.data.user.role).to.equal('superadmin');",
+                  "  pm.collectionVariables.set('superAdminToken', body.data.accessToken);",
+                  "  console.log('✅ superAdminToken stored');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"superadmin@zario.app\",\n  \"password\": \"YourSuperAdminPassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Replace the email/password with what you used in the seed script.\nRun `node scripts/seedSuperAdmin.js` first if you haven't already."
+          },
+          "response": []
+        },
+        {
+          "name": "0.2 Login as Owner (existing registered user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Owner token stored', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.user.role).to.equal('owner');",
+                  "  pm.collectionVariables.set('ownerToken', body.data.accessToken);",
+                  "  pm.collectionVariables.set('targetUserId', body.data.user.id);",
+                  "  console.log('✅ ownerToken and targetUserId stored:', body.data.user.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"OwnerPassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Use an existing registered + email-verified owner account.\nThis sets targetUserId — used in all user management tests."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Superadmin — Admin Management",
+      "description": "Only superadmin can create and list admin accounts.",
+      "item": [
+        {
+          "name": "1.1 Create Admin (superadmin) ✅ 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Admin created correctly', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data.admin.role).to.equal('admin');",
+                  "  pm.expect(body.data.admin.isEmailVerified).to.be.true;",
+                  "  pm.collectionVariables.set('createdAdminId', body.data.admin.id);",
+                  "  pm.collectionVariables.set('createdAdminEmail', body.data.admin.email);",
+                  "  console.log('✅ createdAdminId:', body.data.admin.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/superadmin/admins",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Admin\",\n  \"username\": \"testadmin\",\n  \"email\": \"testadmin@zario.app\",\n  \"password\": \"AdminPass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.2 Create Admin — Duplicate Email ✅ 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Error message mentions email', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  pm.expect(body.message.toLowerCase()).to.include('email');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/superadmin/admins",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Duplicate Admin\",\n  \"username\": \"anotheradmin\",\n  \"email\": \"testadmin@zario.app\",\n  \"password\": \"AdminPass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.3 Create Admin — Weak Password ✅ 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 Validation', () => pm.response.to.have.status(422));",
+                  "pm.test('Validation error returned', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  pm.expect(body.error).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/superadmin/admins",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bad Admin\",\n  \"username\": \"badadmin\",\n  \"email\": \"badadmin@zario.app\",\n  \"password\": \"weak\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.4 Create Admin — Owner Token Blocked ✅ 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('Access denied', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/superadmin/admins",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sneaky Admin\",\n  \"username\": \"sneakyadmin\",\n  \"email\": \"sneaky@zario.app\",\n  \"password\": \"AdminPass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.5 Login as New Admin (store adminToken)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Admin token stored', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.user.role).to.equal('admin');",
+                  "  pm.collectionVariables.set('adminToken', body.data.accessToken);",
+                  "  console.log('✅ adminToken stored');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testadmin@zario.app\",\n  \"password\": \"AdminPass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Admins skip email verification (isEmailVerified: true on creation), so login works immediately."
+          },
+          "response": []
+        },
+        {
+          "name": "1.6 List Admins (superadmin) ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns admin list with pagination', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data.admins).to.be.an('array');",
+                  "  pm.expect(body.data.pagination).to.have.keys(['total','page','limit','pages']);",
+                  "  pm.expect(body.data.admins.length).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/superadmin/admins"
+          },
+          "response": []
+        },
+        {
+          "name": "1.7 List Admins — Admin Blocked ✅ 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — admin cannot list admins', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/superadmin/admins"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Admin — System Stats",
+      "item": [
+        {
+          "name": "2.1 Get System Stats (admin) ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Stats shape is correct', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data).to.have.keys(['users','businesses','plans','roles']);",
+                  "  pm.expect(data.users).to.have.keys(['total','active','inactive','verified','unverified','newLast7Days','newLast30Days']);",
+                  "  pm.expect(data.businesses).to.have.keys(['total','active','inactive','onboarded','inProgress','whatsappConnected','newLast30Days']);",
+                  "  pm.expect(data.users.total).to.be.a('number');",
+                  "  pm.expect(data.businesses.total).to.be.a('number');",
+                  "  console.log('📊 Stats:', JSON.stringify(data, null, 2));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/stats"
+          },
+          "response": []
+        },
+        {
+          "name": "2.2 Get System Stats (superadmin) ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — superadmin can also access stats', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/stats"
+          },
+          "response": []
+        },
+        {
+          "name": "2.3 Get System Stats — Owner Blocked ✅ 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — owners cannot access admin stats', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/stats"
+          },
+          "response": []
+        },
+        {
+          "name": "2.4 Get System Stats — No Token ✅ 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 — unauthenticated', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/admin/stats"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Admin — User Management",
+      "description": "Requires targetUserId to be set from folder 0.",
+      "item": [
+        {
+          "name": "3.1 List Users (admin) ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns paginated user list', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.users).to.be.an('array');",
+                  "  pm.expect(data.pagination).to.have.keys(['total','page','limit','pages']);",
+                  "});",
+                  "pm.test('No superadmin accounts in admin view', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  const hasSuperAdmin = data.users.some(u => u.role === 'superadmin');",
+                  "  pm.expect(hasSuperAdmin).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users?page=1&limit=10",
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.2 List Users — Filter by Role=owner ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Only owner-role users returned', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  const allOwners = data.users.every(u => u.role === 'owner');",
+                  "  pm.expect(allOwners).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users?role=owner",
+              "query": [
+                {
+                  "key": "role",
+                  "value": "owner"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.3 List Users — Filter isActive=false ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All users inactive', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  if (data.users.length > 0) {",
+                  "    const allInactive = data.users.every(u => u.isActive === false);",
+                  "    pm.expect(allInactive).to.be.true;",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users?isActive=false",
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "false"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.4 List Users — Search by name/email ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Search returns results array', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.users).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users?search=test",
+              "query": [
+                {
+                  "key": "search",
+                  "value": "test"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.5 List Users — Admin Tries role=superadmin ✅ 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — admin cannot filter by superadmin role', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users?role=superadmin",
+              "query": [
+                {
+                  "key": "role",
+                  "value": "superadmin"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.6 Get User Detail ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('User and business returned', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.user).to.have.keys(['id','name','username','email','role','isActive','isEmailVerified']);",
+                  "  // business may be null if user has none",
+                  "  if (data.business) {",
+                  "    pm.collectionVariables.set('targetBusinessId', data.business._id || data.business.id);",
+                  "    console.log('✅ targetBusinessId stored:', data.business._id || data.business.id);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{targetUserId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "3.7 Get User Detail — Invalid ObjectId ✅ 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 — invalid ObjectId fails validation', () => pm.response.to.have.status(422));",
+                  "pm.test('Validation error on userId field', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.error).to.be.an('array');",
+                  "  pm.expect(body.error[0].field).to.equal('userId');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/not-a-valid-id"
+          },
+          "response": []
+        },
+        {
+          "name": "3.8 Get User Detail — Non-existent ID ✅ 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/000000000000000000000000"
+          },
+          "response": []
+        },
+        {
+          "name": "3.9 Force Verify Email ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('isEmailVerified is true', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.user.isEmailVerified).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{targetUserId}}/verify-email",
+            "description": "Force-verifies email. Will return 409 if already verified — that's correct behaviour."
+          },
+          "response": []
+        },
+        {
+          "name": "3.10 Force Verify Email — Already Verified ✅ 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 — already verified returns conflict', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{targetUserId}}/verify-email"
+          },
+          "response": []
+        },
+        {
+          "name": "3.11 Admin-Initiated Password Reset ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Dev token exposed in development', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  // In development mode, _devResetToken should be present",
+                  "  if (data._devResetToken) {",
+                  "    pm.expect(data._devResetToken).to.be.a('string');",
+                  "    console.log('Dev reset token:', data._devResetToken);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{targetUserId}}/reset-password",
+            "description": "Generates a password reset token and (in dev mode) returns it in _devResetToken."
+          },
+          "response": []
+        },
+        {
+          "name": "3.12 Change User Role — owner → staff ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Role changed and previousRole returned', () => {",
+                  "  const { data, message } = pm.response.json();",
+                  "  pm.expect(data.user.role).to.equal('staff');",
+                  "  pm.expect(data.previousRole).to.equal('owner');",
+                  "  pm.expect(message).to.include('invalidated');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{targetUserId}}/role",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"staff\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.13 Change User Role — staff → owner (restore) ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — role restored to owner', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{targetUserId}}/role",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"owner\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.14 Change User Role — Admin Tries to Assign Admin Role ✅ 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — admin cannot elevate to admin role', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{targetUserId}}/role",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.15 Deactivate User ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('User is deactivated', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.user.isActive).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{targetUserId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.16 Deactivated User Cannot Login ✅ 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — deactivated users are blocked at login', () => pm.response.to.have.status(403));",
+                  "pm.test('Error mentions deactivated', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message.toLowerCase()).to.include('deactivated');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"OwnerPassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "After deactivation, the owner should be blocked from logging in."
+          },
+          "response": []
+        },
+        {
+          "name": "3.17 Reactivate User ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('User is reactivated', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.user.isActive).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{targetUserId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Admin — Business Management",
+      "description": "Requires targetBusinessId. It gets set automatically by test 3.6 if the owner has a business. Otherwise set it manually.",
+      "item": [
+        {
+          "name": "4.1 List Businesses ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns paginated businesses with owner populated', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.businesses).to.be.an('array');",
+                  "  pm.expect(data.pagination).to.have.keys(['total','page','limit','pages']);",
+                  "  if (data.businesses.length > 0) {",
+                  "    pm.expect(data.businesses[0]).to.have.property('ownerId');",
+                  "    // Store the first business ID if targetBusinessId not yet set",
+                  "    if (!pm.collectionVariables.get('targetBusinessId')) {",
+                  "      const bid = data.businesses[0]._id;",
+                  "      pm.collectionVariables.set('targetBusinessId', bid);",
+                  "      console.log('✅ targetBusinessId auto-set:', bid);",
+                  "    }",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/businesses?page=1&limit=10",
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.2 List Businesses — Filter isActive=true ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All returned businesses are active', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  if (data.businesses.length > 0) {",
+                  "    pm.expect(data.businesses.every(b => b.isActive === true)).to.be.true;",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/businesses?isActive=true",
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.3 Get Business Detail ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Business returned with populated ownerId', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.business).to.be.an('object');",
+                  "  pm.expect(data.business.ownerId).to.be.an('object');",
+                  "  pm.expect(data.business.ownerId.email).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/businesses/{{targetBusinessId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "4.4 Set Business Verified ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Business isVerified = true', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.business.isVerified).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/businesses/{{targetBusinessId}}/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isVerified\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.5 Upgrade Business Plan ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Plan upgraded to starter', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.business.plan.currentPlan).to.equal('starter');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/businesses/{{targetBusinessId}}/upgrade-plan",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPlan\": \"starter\",\n  \"paymentMethod\": \"manual\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.6 Upgrade Plan — Invalid Plan ✅ 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 — invalid plan name rejected', () => pm.response.to.have.status(422));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/businesses/{{targetBusinessId}}/upgrade-plan",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPlan\": \"platinum\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.7 Force Advance Onboarding to Step 3 ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Onboarding step is 3', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.business.onboardingStep).to.equal(3);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/businesses/{{targetBusinessId}}/onboarding",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"step\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.8 Force Advance Onboarding to Step 5 (marks complete) ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Onboarding complete when step = 5', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.business.onboardingStep).to.equal(5);",
+                  "  pm.expect(data.business.onboardingComplete).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/businesses/{{targetBusinessId}}/onboarding",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"step\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.9 Deactivate Business ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Business is deactivated', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.business.isActive).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/businesses/{{targetBusinessId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.10 Reactivate Business ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Business is reactivated', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.business.isActive).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/businesses/{{targetBusinessId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Privilege Guards",
+      "description": "Confirm the role hierarchy is airtight.",
+      "item": [
+        {
+          "name": "5.1 Admin Cannot Delete User (superadmin-only) ✅ 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — delete is superadmin only', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/superadmin/users/{{targetUserId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "5.2 Superadmin Cannot Delete Themselves ✅ 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — self-deletion blocked', () => {",
+                  "  // This requires knowing the superadmin's own userId.",
+                  "  // It will return 403 only if targetUserId === superadmin's ID.",
+                  "  // If not, it will delete the target user — set targetUserId to superadmin's ID first.",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/superadmin/users/{{targetUserId}}",
+            "description": "⚠️ Before running: manually set targetUserId to the superadmin's own ID (from login response).\nIf targetUserId is NOT the superadmin ID, this will permanently delete that user."
+          },
+          "response": []
+        },
+        {
+          "name": "5.3 Admin Cannot Modify Another Admin ✅ 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — admin cannot deactivate another admin', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{createdAdminId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses createdAdminId (another admin). Admin cannot touch a same-rank account."
+          },
+          "response": []
+        },
+        {
+          "name": "5.4 Owner Cannot Access Any Admin Route ✅ 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — owners have no access to admin routes', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users"
+          },
+          "response": []
+        },
+        {
+          "name": "5.5 No Token — All Admin Routes Return 401 ✅ 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 — unauthenticated request blocked', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/admin/businesses"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Superadmin — Delete User (run last)",
+      "description": "Destructive test — run last. Deletes the admin created in folder 1.",
+      "item": [
+        {
+          "name": "6.1 Delete Created Admin (superadmin) ✅ 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Deletion confirmed', () => {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.expect(data.deletedUserId).to.be.a('string');",
+                  "  console.log('✅ Deleted user:', data.deletedUserId);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/superadmin/users/{{createdAdminId}}",
+            "description": "Uses createdAdminId set in test 1.1. This permanently deletes the test admin account."
+          },
+          "response": []
+        },
+        {
+          "name": "6.2 Delete Same User Again ✅ 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — already deleted', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/superadmin/users/{{createdAdminId}}"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

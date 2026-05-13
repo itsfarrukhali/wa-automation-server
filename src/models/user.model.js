@@ -82,7 +82,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["owner", "staff", "admin"],
+      enum: ["superadmin", "owner", "staff", "admin"],
       default: "owner",
     },
     profilePicture: {
@@ -203,6 +203,7 @@ const userSchema = new mongoose.Schema(
 userSchema.index({ "refreshTokens.expiresAt": 1 });
 userSchema.index({ "refreshTokens.tokenHash": 1 });
 userSchema.index({ email: 1, isActive: 1 });
+userSchema.index({ role: 1, isActive: 1 });
 
 // Virtual for full profile
 userSchema.virtual("profile").get(function () {
@@ -211,10 +212,14 @@ userSchema.virtual("profile").get(function () {
     name: this.name,
     username: this.username,
     email: this.email,
+    phone: this.phone,
     profilePicture: this.profilePicture,
     role: this.role,
+    businessId: this.businessId,
     isActive: this.isActive,
     isEmailVerified: this.isEmailVerified,
+    lastLoginAt: this.lastLoginAt,
+    createdAt: this.createdAt,
   };
 });
 
