@@ -1,0 +1,273 @@
+{
+  "info": {
+    "name": "Zario - Core Owner Workflow",
+    "_postman_id": "zario-core-workflow-v1",
+    "description": "Run in order after login. Creates a customer, service and booking, then processes payment and completion.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "zario_access_token", "value": "" },
+    { "key": "owner_id", "value": "" },
+    { "key": "customer_id", "value": "" },
+    { "key": "service_id", "value": "" },
+    { "key": "booking_id", "value": "" },
+    { "key": "scheduled_at", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1 - Get Current Owner",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/auth/me"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json().data;",
+              "const user = data.user || data;",
+              "if (user.id || user._id) pm.collectionVariables.set('owner_id', user.id || user._id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - Create Customer",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const suffix = String(Date.now()).slice(-9);",
+              "pm.variables.set('test_phone', '03' + suffix);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "const customer = pm.response.json().data.customer;",
+              "pm.collectionVariables.set('customer_id', customer._id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Postman Customer\",\n  \"phone\": \"{{test_phone}}\",\n  \"email\": \"postman.customer@example.com\",\n  \"whatsappOptIn\": true\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/customers"
+      }
+    },
+    {
+      "name": "3 - Create Service",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.variables.set('service_name', 'Postman Haircut ' + String(Date.now()).slice(-6));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "const service = pm.response.json().data.service;",
+              "pm.collectionVariables.set('service_id', service._id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{service_name}}\",\n  \"price\": 2500,\n  \"duration\": 45,\n  \"bufferBefore\": 5,\n  \"bufferAfter\": 5,\n  \"category\": \"Hair\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/services"
+      }
+    },
+    {
+      "name": "4 - Create Booking",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const date = new Date();",
+              "date.setUTCDate(date.getUTCDate() + 2);",
+              "while (date.getUTCDay() === 0) date.setUTCDate(date.getUTCDate() + 1);",
+              "const day = date.toISOString().slice(0, 10);",
+              "pm.collectionVariables.set('scheduled_at', day + 'T10:00:00+05:00');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "const booking = pm.response.json().data.booking;",
+              "pm.collectionVariables.set('booking_id', booking._id);",
+              "pm.test('Booking starts pending', () => pm.expect(booking.status).to.eql('pending'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"serviceId\": \"{{service_id}}\",\n  \"staffId\": \"{{owner_id}}\",\n  \"scheduledAt\": \"{{scheduled_at}}\",\n  \"source\": \"staff\",\n  \"notes\": \"Created by the Postman workflow\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/bookings"
+      }
+    },
+    {
+      "name": "5 - Confirm Booking",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"status\": \"confirmed\"\n}" },
+        "url": "{{baseUrl}}/api/v1/bookings/{{booking_id}}/status"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Booking confirmed', () => pm.expect(pm.response.json().data.booking.status).to.eql('confirmed'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 - Add Partial Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 1000,\n  \"method\": \"jazzcash\",\n  \"reference\": \"POSTMAN-TX-001\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/bookings/{{booking_id}}/payments"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Payment is partial', () => pm.expect(pm.response.json().data.booking.paymentStatus).to.eql('partial'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 - Mark Arrived",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"status\": \"arrived\"\n}" },
+        "url": "{{baseUrl}}/api/v1/bookings/{{booking_id}}/status"
+      }
+    },
+    {
+      "name": "8 - Mark In Progress",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"status\": \"in_progress\"\n}" },
+        "url": "{{baseUrl}}/api/v1/bookings/{{booking_id}}/status"
+      }
+    },
+    {
+      "name": "9 - Complete Booking",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"completed\",\n  \"feedback\": {\n    \"rating\": 5,\n    \"comment\": \"Excellent service\"\n  }\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/bookings/{{booking_id}}/status"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Booking completed', () => pm.expect(pm.response.json().data.booking.status).to.eql('completed'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Verify Dashboard",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/business/dashboard"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Completed booking is counted', () => pm.expect(pm.response.json().data.bookings.completed).to.be.at.least(1));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -207,9 +207,7 @@ const messageLogSchema = new mongoose.Schema(
     // WhatsApp Metadata
     waMessageId: {
       type: String,
-      default: null,
       index: true,
-      sparse: true, // Allow nulls
     },
     waBusinessPhone: String, // From which number
     waCustomerPhone: String, // To which number
@@ -388,18 +386,23 @@ messageLogSchema.index(
 
 // Unread messages count
 messageLogSchema.index(
+  { businessId: 1, sentAt: -1 },
   {
-    businessId: 1,
-    direction: "in",
-    "readReceipts.readerType": { $ne: "staff" },
+    name: "unread_inbound",
+    partialFilterExpression: { direction: "in" },
   },
-  { name: "unread_inbound" },
 );
 
 // Webhook lookup (CRITICAL for WhatsApp status updates)
 messageLogSchema.index(
   { waMessageId: 1 },
-  { unique: true, sparse: true, name: "wa_message_lookup" },
+  {
+    unique: true,
+    name: "wa_message_lookup",
+    partialFilterExpression: {
+      waMessageId: { $type: "string" },
+    },
+  },
 );
 
 // Campaign performance
@@ -410,14 +413,20 @@ messageLogSchema.index(
 
 // Scheduled messages
 messageLogSchema.index(
-  { scheduledFor: 1, status: "pending" },
-  { name: "scheduled_messages" },
+  { scheduledFor: 1 },
+  {
+    name: "scheduled_messages",
+    partialFilterExpression: { status: "pending" },
+  },
 );
 
 // Failed messages for retry
 messageLogSchema.index(
-  { status: "failed", retryCount: { $lt: 3 } },
-  { name: "retry_failed" },
+  { retryCount: 1, failedAt: 1 },
+  {
+    name: "retry_failed",
+    partialFilterExpression: { status: "failed" },
+  },
 );
 
 // AI training data
@@ -444,57 +453,51 @@ messageLogSchema.index({ content: "text" }, { name: "message_search" });
 // MIDDLEWARE
 
 // Pre-save middleware
-messageLogSchema.pre("save", async function (next) {
-  try {
-    // Set conversation ID
-    if (!this.conversationId) {
-      this.conversationId = `${this.businessId}_${this.customerId}`;
-    }
-
-    // Check if first message in conversation
-    if (this.isNew) {
-      const count = await this.constructor.countDocuments({
-        businessId: this.businessId,
-        customerId: this.customerId,
-      });
-      this.isFirstMessage = count === 0;
-    }
-
-    // Update status history
-    if (this.isModified("status")) {
-      this.statusHistory = this.statusHistory || [];
-      this.statusHistory.push({
-        status: this.status,
-        timestamp: new Date(),
-        details: this.status === "failed" ? this.failureReason : undefined,
-      });
-    }
-
-    // Set timestamps based on status
-    const now = new Date();
-    if (this.status === "sent" && !this.sentAt) {
-      this.sentAt = now;
-    }
-    if (this.status === "delivered" && !this.deliveredAt) {
-      this.deliveredAt = now;
-    }
-    if (this.status === "read" && !this.readAt) {
-      this.readAt = now;
-    }
-    if (this.status === "failed" && !this.failedAt) {
-      this.failedAt = now;
-    }
-
-    // Detect PII
-    this.containsPII = this.detectPII();
-
-    // Set pricing category based on type
-    this.setPricingCategory();
-
-    next();
-  } catch (error) {
-    next(error);
+messageLogSchema.pre("save", async function () {
+  // Set conversation ID
+  if (!this.conversationId) {
+    this.conversationId = `${this.businessId}_${this.customerId}`;
   }
+
+  // Check if first message in conversation
+  if (this.isNew) {
+    const count = await this.constructor.countDocuments({
+      businessId: this.businessId,
+      customerId: this.customerId,
+    });
+    this.isFirstMessage = count === 0;
+  }
+
+  // Update status history
+  if (this.isModified("status")) {
+    this.statusHistory = this.statusHistory || [];
+    this.statusHistory.push({
+      status: this.status,
+      timestamp: new Date(),
+      details: this.status === "failed" ? this.failureReason : undefined,
+    });
+  }
+
+  // Set timestamps based on status
+  const now = new Date();
+  if (this.status === "sent" && !this.sentAt) {
+    this.sentAt = now;
+  }
+  if (this.status === "delivered" && !this.deliveredAt) {
+    this.deliveredAt = now;
+  }
+  if (this.status === "read" && !this.readAt) {
+    this.readAt = now;
+  }
+  if (this.status === "failed" && !this.failedAt) {
+    this.failedAt = now;
+  }
+
+  // Detect PII
+  this.containsPII = this.detectPII();
+
+  // Set pricing category based on type
+  this.setPricingCategory();
 });
 
 // Post-save middleware
@@ -720,7 +723,7 @@ messageLogSchema.statics.getAnalytics = async function (
   endDate,
 ) {
   const match = {
-    businessId: mongoose.Types.ObjectId(businessId),
+    businessId: new mongoose.Types.ObjectId(businessId),
     sentAt: { $gte: startDate, $lte: endDate },
   };
 

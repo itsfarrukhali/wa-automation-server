@@ -107,6 +107,7 @@ const planSchema = new mongoose.Schema(
 
 // Methods for plan management
 planSchema.methods.canSendMessage = function () {
+  if (this.limits.monthlyMessages === -1) return true;
   return this.usage.messagesThisMonth < this.limits.monthlyMessages;
 };
 
@@ -132,21 +133,37 @@ planSchema.methods.upgradeTo = function (newPlan) {
       monthlyMessages: 500,
       staffAccounts: 1,
       customers: 100,
+      templates: 3,
+      campaigns: 1,
+      automationRules: 2,
+      reportsHistory: 30,
     },
     starter: {
       monthlyMessages: 2000,
       staffAccounts: 3,
       customers: 500,
+      templates: 3,
+      campaigns: 1,
+      automationRules: 2,
+      reportsHistory: 30,
     },
     growth: {
       monthlyMessages: 10000,
       staffAccounts: 10,
       customers: 2000,
+      templates: 10,
+      campaigns: 5,
+      automationRules: 10,
+      reportsHistory: 180,
     },
     enterprise: {
       monthlyMessages: 50000,
       staffAccounts: -1,
       customers: -1,
+      templates: -1,
+      campaigns: -1,
+      automationRules: -1,
+      reportsHistory: 365,
     },
   };
 

@@ -94,8 +94,8 @@ const advanceOnboardingStep = (business, completedStep) => {
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
-export const getMyBusiness = async (userId) => {
-  return getOwnedBusiness(userId);
+export const getMyBusiness = async (userId, selectFields = "") => {
+  return getOwnedBusiness(userId, selectFields);
 };
 
 export const getOnboardingStatus = async (userId) => {
@@ -493,9 +493,15 @@ export const getDashboardStats = async (userId) => {
     bookingsPending,
     bookingsCompleted,
   ] = await Promise.all([
-    Customer.countDocuments({ businessId, isActive: true }),
     Customer.countDocuments({
       businessId,
+      status: { $ne: "deleted" },
+      deletedAt: null,
+    }),
+    Customer.countDocuments({
+      businessId,
+      status: { $ne: "deleted" },
+      deletedAt: null,
       lastVisit: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }, // ✅ corrected field
     }),
     Booking.countDocuments({

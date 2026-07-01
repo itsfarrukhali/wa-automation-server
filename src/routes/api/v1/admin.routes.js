@@ -18,6 +18,8 @@ import {
   upgradePlan,
   forceAdvanceOnboarding,
 } from "../../../controllers/admin.controller.js";
+import { listAuditLogs } from "../../../controllers/audit.controller.js";
+import { listLogFiles, tailLogFile } from "../../../controllers/log.controller.js";
 
 import {
   listUsersValidator,
@@ -33,6 +35,14 @@ import {
   setVerifiedValidator,
   validate,
 } from "../../../utils/validators/admin.validator.js";
+import {
+  listAuditLogsValidator,
+  validate as validateAudit,
+} from "../../../utils/validators/audit.validator.js";
+import {
+  tailLogValidator,
+  validate as validateLog,
+} from "../../../utils/validators/log.validator.js";
 
 import {
   verifyToken,
@@ -45,6 +55,9 @@ const adminRouter = Router();
 adminRouter.use(verifyToken, requireAdmin);
 
 adminRouter.get("/stats", getSystemStats);
+adminRouter.get("/audit-logs", listAuditLogsValidator, validateAudit, listAuditLogs);
+adminRouter.get("/logs", listLogFiles);
+adminRouter.get("/logs/tail", tailLogValidator, validateLog, tailLogFile);
 
 adminRouter.get("/users", listUsersValidator, validate, listUsers);
 adminRouter.get(

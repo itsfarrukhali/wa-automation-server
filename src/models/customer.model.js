@@ -140,6 +140,7 @@ const customerSchema = new mongoose.Schema(
     source: {
       type: String,
       enum: [
+        "manual",
         "walk_in",
         "whatsapp",
         "phone_call",
@@ -151,7 +152,7 @@ const customerSchema = new mongoose.Schema(
         "import",
         "other",
       ],
-      default: "whatsapp",
+      default: "manual",
     },
     referredBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -332,6 +333,11 @@ const customerSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    whatsappOptIn: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
     consentDate: Date,
     dataRetentionDate: {
       type: Date,
@@ -344,6 +350,16 @@ const customerSchema = new mongoose.Schema(
     lastUpdatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
   },
   {
@@ -403,57 +419,24 @@ customerSchema.index({ name: "text", phone: "text" });
 // MIDDLEWARE
 
 // Pre-save hooks
-customerSchema.pre("save", function (next) {
-  try {
-    // Format phone numbers
-    if (this.phone) {
-      this.phone = this.formatPhoneNumber(this.phone);
-    }
-    if (this.whatsappNumber) {
-      this.whatsappNumber = this.formatPhoneNumber(this.whatsappNumber);
-    }
-
-    // If no WhatsApp number, use phone
-    if (!this.whatsappNumber && this.phone) {
-      this.whatsappNumber = this.phone;
-    }
-
-    // Calculate average spend
-    if (this.totalVisits > 0) {
-      this.averageSpendPerVisit = this.totalSpent / this.totalVisits;
-    }
-
-    // Update engagement score
-    this.calculateEngagementScore();
-
-    // Auto-tag based on metrics
-    this.autoTag();
-
-    // Update status based on activity
-    this.updateStatus();
-
-    next();
-  } catch (error) {
-    next(error);
+customerSchema.pre("save", function () {
+  if (this.phone) {
+    this.phone = this.formatPhoneNumber(this.phone);
   }
-});
-
-// Post-save hook for async operations
-customerSchema.post("save", async function (doc) {
-  // Update business analytics
-  if (this.isNew) {
-    await mongoose.model("Business").updateOne(
-      { _id: this.businessId },
-      {
-        $inc: { "analytics.totalCustomers": 1 },
-        $set: {
-          "plan.usage.customerCount": await this.constructor.countDocuments({
-            businessId: this.businessId,
-          }),
-        },
-      },
-    );
+  if (this.whatsappNumber) {
+    this.whatsappNumber = this.formatPhoneNumber(this.whatsappNumber);
   }
+
+  if (!this.whatsappNumber && this.phone) {
+    this.whatsappNumber = this.phone;
+  }
+
+  this.optedOut = !this.whatsappOptIn;
+  this.averageSpendPerVisit =
+    this.totalVisits > 0 ? this.totalSpent / this.totalVisits : 0;
+  this.calculateEngagementScore();
+  this.autoTag();
+  this.updateStatus();
 });
 
 // VIRTUALS
@@ -555,7 +538,6 @@ customerSchema.methods.autoTag = function () {
   // Remove old auto-tags
   tags.delete("new");
   tags.delete("inactive");
-  tags.delete("vip");
   tags.delete("at_risk");
   tags.delete("lost");
 
@@ -676,6 +658,7 @@ customerSchema.methods.optOut = async function (
   categories = [],
 ) {
   this.optedOut = true;
+  this.whatsappOptIn = false;
   this.optedOutAt = new Date();
   this.optOutReason = reason;
 
@@ -689,6 +672,7 @@ customerSchema.methods.optOut = async function (
 // Opt-in again
 customerSchema.methods.optIn = async function () {
   this.optedOut = false;
+  this.whatsappOptIn = true;
   this.optedOutAt = null;
   this.optOutReason = null;
   this.waOptOutCategories = [];

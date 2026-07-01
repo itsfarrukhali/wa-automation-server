@@ -1,0 +1,172 @@
+{
+  "info": {
+    "name": "Zario - WhatsApp Template Workflow",
+    "_postman_id": "zario-template-workflow-v1",
+    "description": "Manual QA collection for WhatsApp template registry and Meta sync endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "zario_access_token", "value": "" },
+    { "key": "template_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1 - Create Local Template",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Appointment Reminder\",\n  \"language\": \"en\",\n  \"category\": \"UTILITY\",\n  \"status\": \"PENDING\",\n  \"components\": [\n    {\n      \"type\": \"BODY\",\n      \"text\": \"Assalam o alaikum {{1}}, reminder for your appointment at {{2}}.\"\n    }\n  ]\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/whatsapp/templates"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201 or duplicate', () => pm.expect([201, 409]).to.include(pm.response.code));",
+              "if (pm.response.code === 201) {",
+              "  pm.collectionVariables.set('template_id', pm.response.json().data.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - List Templates",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/whatsapp/templates"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Templates array', () => pm.expect(pm.response.json().data.templates).to.be.an('array'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Template Stats",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/whatsapp/templates/stats"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has total', () => pm.expect(pm.response.json().data.total).to.be.a('number'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Mark Template Used",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/whatsapp/templates/{{template_id}}/mark-used"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or missing template id', () => pm.expect([200, 404, 422]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - Sync Templates From Meta",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/whatsapp/templates/sync",
+        "description": "Requires connected WABA ID and access token. This calls Meta Graph API."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or config/provider issue', () => pm.expect([200, 422, 502]).to.include(pm.response.code));",
+              "if (pm.response.code === 200) console.log('Synced:', pm.response.json().data.synced);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 - Update Template Status",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"APPROVED\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/whatsapp/templates/{{template_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or missing template id', () => pm.expect([200, 404, 422]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 - Delete Template",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/whatsapp/templates/{{template_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or missing template id', () => pm.expect([200, 404, 422]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

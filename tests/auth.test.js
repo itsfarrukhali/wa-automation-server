@@ -44,7 +44,7 @@ const seedReferenceData = async () => {
         isActive: true,
       },
     },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
 };
 

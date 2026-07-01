@@ -6,11 +6,19 @@
   "author": "Farrukh Ali",
   "type": "module",
   "main": "server.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node server.js",
     "seed": "node seed/index.js",
+    "reset:superadmin": "node scripts/reset-superadmin.js",
+    "repair:message-index": "node scripts/repair-message-index.js",
+    "backup:mongo": "node scripts/backup-mongodb.js",
+    "restore:mongo": "node scripts/restore-mongodb.js",
+    "validate:prod-env": "node scripts/validate-production-env.js",
     "dev": "nodemon --legacy-watch server.js",
-    "test": "mocha --experimental-vm-modules --timeout 15000 --exit \"tests/**/*.js\""
+    "test": "node scripts/run-tests.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",

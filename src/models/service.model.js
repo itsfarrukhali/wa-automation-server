@@ -216,51 +216,23 @@ serviceSchema.index({ name: "text", description: "text" });
 // MIDDLEWARE
 
 // Pre-save middleware
-serviceSchema.pre("save", function (next) {
-  try {
-    // Calculate total package duration
-    if (this.isPackage && this.packageServices?.length) {
-      this.duration = this.packageServices.reduce(
-        (total, service) => total + (service.duration || 0),
-        0,
-      );
-      this.price = this.packageServices.reduce(
-        (total, service) => total + (service.price || 0),
-        0,
-      );
-    }
-
-    // Update popularity score
-    this.updatePopularityScore();
-
-    // Auto-categorize based on business type if not set
-    if (!this.category || this.category === "General") {
-      this.category = this.suggestCategory();
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+serviceSchema.pre("save", function () {
+  // Calculate total package duration
+  if (this.isPackage && this.packageServices?.length) {
+    this.duration = this.packageServices.reduce(
+      (total, service) => total + (service.duration || 0),
+      0,
+    );
+    this.price = this.packageServices.reduce(
+      (total, service) => total + (service.price || 0),
+      0,
+    );
   }
-});
 
-// Post-save middleware
-serviceSchema.post("save", async function (doc) {
-  try {
-    // Update business service count
-    const serviceCount = await this.constructor.countDocuments({
-      businessId: this.businessId,
-      isActive: true,
-    });
+  this.updatePopularityScore();
 
-    await mongoose
-      .model("Business")
-      .updateOne(
-        { _id: this.businessId },
-        { $set: { "analytics.totalServices": serviceCount } },
-      );
-  } catch (error) {
-    console.error("Post-save hook error:", error);
+  if (!this.category || this.category === "General") {
+    this.category = this.suggestCategory();
   }
 });
 
@@ -363,7 +335,9 @@ serviceSchema.methods.canStaffPerform = function (staffId) {
     return true;
   }
 
-  return this.assignedStaff.includes(staffId);
+  return this.assignedStaff.some(
+    (assignedId) => assignedId.toString() === staffId.toString(),
+  );
 };
 
 // Get available staff for this service

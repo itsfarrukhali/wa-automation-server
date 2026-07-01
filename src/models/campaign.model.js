@@ -475,10 +475,6 @@ campaignSchema.index({
   status: 1,
 });
 
-// Message tracking indexes
-campaignSchema.index({ "messages.status": 1 });
-campaignSchema.index({ "messages.customerId": 1 });
-
 // Analytics indexes
 campaignSchema.index({
   businessId: 1,
@@ -492,25 +488,19 @@ campaignSchema.index({ name: "text", description: "text" });
 // MIDDLEWARE
 
 // Pre-save middleware
-campaignSchema.pre("save", async function (next) {
-  try {
-    // Calculate metrics
-    if (this.messages && this.messages.length > 0) {
-      this.calculateMetrics();
-    }
-
-    // Set next run date for recurring campaigns
-    if (this.schedule && this.schedule.frequency !== "once") {
-      this.calculateNextRun();
-    }
-
-    // Validate template for type
-    this.validateTemplateForType();
-
-    next();
-  } catch (error) {
-    next(error);
+campaignSchema.pre("save", function () {
+  // Calculate metrics
+  if (this.messages && this.messages.length > 0) {
+    this.calculateMetrics();
   }
+
+  // Set next run date for recurring campaigns
+  if (this.schedule && this.schedule.frequency !== "once") {
+    this.calculateNextRun();
+  }
+
+  // Validate template for type
+  this.validateTemplateForType();
 });
 
 // Post-save middleware
@@ -556,7 +546,9 @@ campaignSchema.methods.calculateMetrics = function () {
   const messages = this.messages || [];
 
   // Reset metrics
-  this.metrics.sent = messages.filter((m) => m.status !== "pending").length;
+  this.metrics.sent = messages.filter((m) =>
+    ["sent", "delivered", "read"].includes(m.status),
+  ).length;
   this.metrics.delivered = messages.filter(
     (m) => m.status === "delivered",
   ).length;
@@ -650,11 +642,10 @@ campaignSchema.methods.validateTemplateForType = function () {
   const required = requiredVariables[this.type] || ["name"];
 
   // Check if template contains required variables
+  this.templateWarnings = [];
   for (const variable of required) {
     if (!this.message.includes(`{{${variable}}}`)) {
-      console.warn(
-        `Campaign ${this.name} missing recommended variable: ${variable}`,
-      );
+      this.templateWarnings.push(`Missing recommended variable: ${variable}`);
     }
   }
 };

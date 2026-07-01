@@ -231,6 +231,7 @@ const bookingSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    completedAt: Date,
 
     // Payment Information
     paymentStatus: {
@@ -439,9 +440,6 @@ bookingSchema.index({
 bookingSchema.index({ businessId: 1, paymentStatus: 1 });
 bookingSchema.index({ businessId: 1, scheduledAt: 1, paymentStatus: 1 });
 
-// For recurring bookings
-bookingSchema.index({ recurringGroupId: 1 });
-
 // For date-based reports
 bookingSchema.index({ businessId: 1, createdAt: -1 });
 bookingSchema.index({ scheduledAt: 1, status: 1 });
@@ -449,116 +447,61 @@ bookingSchema.index({ scheduledAt: 1, status: 1 });
 // MIDDLEWARE
 
 // Pre-save middleware
-bookingSchema.pre("save", async function (next) {
-  try {
-    // Calculate time slot with buffers
-    if (this.scheduledAt && this.serviceDetails?.duration) {
-      const startTime = new Date(this.scheduledAt);
-      const endTime = new Date(
-        startTime.getTime() + this.serviceDetails.duration * 60000,
-      );
+bookingSchema.pre("save", function () {
+  if (this.scheduledAt && this.serviceDetails?.duration) {
+    const startTime = new Date(this.scheduledAt);
+    const endTime = new Date(
+      startTime.getTime() + this.serviceDetails.duration * 60000,
+    );
 
-      this.timeSlot = {
-        startTime,
-        endTime,
-        duration: this.serviceDetails.duration,
-        bufferBefore: this.timeSlot?.bufferBefore || 5,
-        bufferAfter: this.timeSlot?.bufferAfter || 5,
-      };
-    }
+    this.timeSlot = {
+      startTime,
+      endTime,
+      duration: this.serviceDetails.duration,
+      bufferBefore: this.timeSlot?.bufferBefore ?? 5,
+      bufferAfter: this.timeSlot?.bufferAfter ?? 5,
+    };
+  }
 
-    // Calculate amount due
-    this.amountDue = this.totalAmount - this.amountPaid;
+  this.amountDue = Math.max(0, this.totalAmount - this.amountPaid);
 
-    // Update payment status based on amount
+  if (this.paymentStatus !== "refunded" && this.paymentStatus !== "waived") {
     if (this.amountPaid >= this.totalAmount && this.totalAmount > 0) {
       this.paymentStatus = "paid";
     } else if (this.amountPaid > 0) {
       this.paymentStatus = "partial";
+    } else {
+      this.paymentStatus = "unpaid";
     }
-
-    // Track status changes
-    if (this.isModified("status")) {
-      this.statusHistory = this.statusHistory || [];
-      this.statusHistory.push({
-        status: this.status,
-        changedAt: new Date(),
-        changedBy: this.updatedBy,
-        reason:
-          this.status === "cancelled" ? this.cancellationReason : undefined,
-      });
-    }
-
-    // Set reminder scheduled time (24 hours before)
-    if (this.status === "confirmed" && !this.whatsapp?.reminder?.scheduledFor) {
-      const reminderTime = new Date(this.scheduledAt);
-      reminderTime.setHours(reminderTime.getHours() - 24);
-
-      if (!this.whatsapp) this.whatsapp = {};
-      if (!this.whatsapp.reminder) {
-        this.whatsapp.reminder = {
-          scheduledFor: reminderTime,
-          status: "scheduled",
-          reminderType: "24h",
-        };
-      }
-    }
-
-    // Set follow-up scheduled time (after service)
-    if (this.status === "completed" && !this.whatsapp?.followUp?.scheduledFor) {
-      const followUpTime = new Date();
-      followUpTime.setHours(followUpTime.getHours() + 2); // 2 hours after completion
-
-      if (!this.whatsapp) this.whatsapp = {};
-      if (!this.whatsapp.followUp) {
-        this.whatsapp.followUp = {
-          scheduledFor: followUpTime,
-          status: "scheduled",
-        };
-      }
-    }
-
-    // Validate no conflicts (if staff assigned)
-    if (this.isModified("scheduledAt") || this.isModified("staffId")) {
-      await this.checkForConflicts();
-    }
-
-    next();
-  } catch (error) {
-    next(error);
   }
-});
 
-// Post-save middleware
-bookingSchema.post("save", async function (doc) {
-  try {
-    // Update customer metrics
-    if (this.status === "completed") {
-      await mongoose.model("Customer").findByIdAndUpdate(this.customerId, {
-        $inc: {
-          totalVisits: 1,
-          totalSpent: this.totalAmount,
-          totalAppointments: 1,
-          completedAppointments: 1,
-        },
-        $set: { lastVisit: new Date() },
-      });
-    } else if (this.isNew) {
-      await mongoose
-        .model("Customer")
-        .findByIdAndUpdate(this.customerId, { $inc: { totalAppointments: 1 } });
-    }
-
-    // Update business analytics
-    await mongoose.model("Business").findByIdAndUpdate(this.businessId, {
-      $inc: {
-        "analytics.totalAppointments": this.isNew ? 1 : 0,
-        "analytics.totalRevenue":
-          this.status === "completed" ? this.totalAmount : 0,
-      },
+  if (this.isModified("status")) {
+    this.statusHistory = this.statusHistory || [];
+    this.statusHistory.push({
+      status: this.status,
+      changedAt: new Date(),
+      changedBy: this.updatedBy,
+      reason:
+        this.status === "cancelled" ? this.cancellationReason : undefined,
     });
-  } catch (error) {
-    console.error("Post-save hook error:", error);
+  }
+
+  if (this.status === "confirmed" && !this.whatsapp?.reminder?.scheduledFor) {
+    const reminderTime = new Date(this.scheduledAt);
+    reminderTime.setHours(reminderTime.getHours() - 24);
+
+    this.whatsapp.reminder = {
+      scheduledFor: reminderTime,
+      status: "scheduled",
+      reminderType: "24h",
+    };
+  }
+
+  if (this.status === "completed" && !this.whatsapp?.followUp?.scheduledFor) {
+    this.whatsapp.followUp = {
+      scheduledFor: new Date(Date.now() + 2 * 60 * 60 * 1000),
+      status: "scheduled",
+    };
   }
 });
 

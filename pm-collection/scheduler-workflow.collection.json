@@ -1,0 +1,298 @@
+{
+  "info": {
+    "name": "Zario - Scheduler Reminder & Follow-Up Workflow",
+    "_postman_id": "zario-scheduler-workflow-v1",
+    "description": "Manual QA collection for WhatsApp reminder/follow-up scheduler. Prerequisite: create a customer, service, and booking. Confirm booking for reminders; complete booking for follow-ups. To test immediately, set booking.whatsapp.reminder.scheduledFor or booking.whatsapp.followUp.scheduledFor to a past time in MongoDB.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "zario_access_token", "value": "" },
+    { "key": "booking_id", "value": "" },
+    { "key": "customer_id", "value": "" },
+    { "key": "service_id", "value": "" },
+    { "key": "owner_id", "value": "" },
+    { "key": "scheduled_at", "value": "" },
+    { "key": "last_scheduler_message_id", "value": "" },
+    { "key": "last_scheduler_wa_message_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0 - Prerequisite Note",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/business/dashboard",
+        "description": "Before running this scheduler collection, run the Core Owner Workflow collection to create customer_id, service_id, booking_id, and owner_id. Confirm the booking for reminders. Complete a booking for follow-ups."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Dashboard reachable', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 - Confirm Booking (Schedules Reminder)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"confirmed\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/bookings/{{booking_id}}/status"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or already moved', () => pm.expect([200, 409]).to.include(pm.response.code));",
+              "if (pm.response.code === 200) {",
+              "  const booking = pm.response.json().data.booking;",
+              "  pm.test('Booking confirmed', () => pm.expect(booking.status).to.eql('confirmed'));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - Preview Due Scheduled Messages",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/scheduler/due?type=all&limit=25"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json().data;",
+              "pm.test('Has totals', () => pm.expect(data).to.have.property('totals'));",
+              "console.log('Due totals:', data.totals);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Scheduler Dry Run",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"all\",\n  \"limit\": 25,\n  \"dryRun\": true\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/scheduler/run"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Dry run true', () => pm.expect(pm.response.json().data.dryRun).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Run Due Reminders",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"reminder\",\n  \"limit\": 10,\n  \"dryRun\": false\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/scheduler/run"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json().data;",
+              "if (data.results && data.results.length > 0) {",
+              "  const sent = data.results.find(r => r.action === 'sent');",
+              "  if (sent) {",
+              "    pm.collectionVariables.set('last_scheduler_message_id', sent.messageId);",
+              "    if (sent.waMessageId) pm.collectionVariables.set('last_scheduler_wa_message_id', sent.waMessageId);",
+              "  }",
+              "}",
+              "console.log('Scheduler reminder result:', data);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - Move Booking Arrived",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"arrived\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/bookings/{{booking_id}}/status"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or invalid transition', () => pm.expect([200, 409]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 - Move Booking In Progress",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"in_progress\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/bookings/{{booking_id}}/status"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or invalid transition', () => pm.expect([200, 409]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 - Complete Booking (Schedules Follow-Up)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"completed\",\n  \"feedback\": {\n    \"rating\": 5,\n    \"comment\": \"Manual scheduler test completed\"\n  }\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/bookings/{{booking_id}}/status"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or invalid transition', () => pm.expect([200, 409]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 - Preview Due Follow-Ups",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/scheduler/due?type=follow_up&limit=25",
+        "description": "Follow-ups are scheduled 2 hours after completion. For immediate testing, edit booking.whatsapp.followUp.scheduledFor in MongoDB to a past time, then run this request."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "console.log('Due follow-ups:', pm.response.json().data.totals);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9 - Run Due Follow-Ups",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"follow_up\",\n  \"limit\": 10,\n  \"dryRun\": false\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/scheduler/run"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "console.log('Scheduler follow-up result:', pm.response.json().data);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - List Booking Messages",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/messages?customerId={{customer_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Messages array exists', () => pm.expect(pm.response.json().data.messages).to.be.an('array'));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

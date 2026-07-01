@@ -78,22 +78,22 @@ before(async () => {
   await Category.findOneAndUpdate(
     { name: "salon" },
     { $set: { name: "salon", isActive: true } },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
   await Category.findOneAndUpdate(
     { name: "clinic" },
     { $set: { name: "clinic", isActive: true } },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
   await City.findOneAndUpdate(
     { name: "Karachi" },
     { $set: { name: "Karachi", isActive: true } },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
   await City.findOneAndUpdate(
     { name: "Lahore" },
     { $set: { name: "Lahore", isActive: true } },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
 });
 
@@ -116,12 +116,12 @@ beforeEach(async () => {
   await City.findOneAndUpdate(
     { name: "Karachi" },
     { $set: { name: "Karachi", isActive: true } },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
   await City.findOneAndUpdate(
     { name: "Lahore" },
     { $set: { name: "Lahore", isActive: true } },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
 });
 

@@ -1,0 +1,68 @@
+{
+  "info": {
+    "name": "Zario - Billing Workflow",
+    "_postman_id": "zario-billing-workflow-v1",
+    "description": "Manual QA collection for MVP billing/subscription APIs. No real payment gateway is integrated yet.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "zario_access_token", "value": "" },
+    { "key": "checkout_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1 - Public Plan Catalog",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/billing/plans"
+      },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Has plans', () => pm.expect(pm.response.json().data.plans).to.be.an('array'));"] } }]
+    },
+    {
+      "name": "2 - Current Subscription",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{zario_access_token}}" }],
+        "url": "{{baseUrl}}/api/v1/billing/subscription"
+      },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Has current plan', () => pm.expect(pm.response.json().data).to.have.property('currentPlan'));"] } }]
+    },
+    {
+      "name": "3 - Create Checkout Intent",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"plan\": \"starter\",\n  \"paymentMethod\": \"jazzcash\"\n}" },
+        "url": "{{baseUrl}}/api/v1/billing/checkout-intent"
+      },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 201', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('checkout_id', pm.response.json().data.checkoutId);"] } }]
+    },
+    {
+      "name": "4 - Confirm Manual Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"plan\": \"starter\",\n  \"paymentMethod\": \"manual\",\n  \"amount\": 3000,\n  \"reference\": \"MANUAL-QA-001\"\n}" },
+        "url": "{{baseUrl}}/api/v1/billing/manual-payment"
+      },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Plan active', () => pm.expect(pm.response.json().data.paymentStatus).to.eql('active'));"] } }]
+    },
+    {
+      "name": "5 - Cancel Subscription",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{zario_access_token}}" }],
+        "url": "{{baseUrl}}/api/v1/billing/cancel"
+      },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Cancelled', () => pm.expect(pm.response.json().data.paymentStatus).to.eql('cancelled'));"] } }]
+    }
+  ]
+}

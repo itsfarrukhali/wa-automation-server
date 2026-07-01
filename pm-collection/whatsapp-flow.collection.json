@@ -1,0 +1,179 @@
+{
+  "info": {
+    "name": "Zario - WhatsApp Manual Flow",
+    "_postman_id": "zario-whatsapp-flow-v1",
+    "description": "Manual WhatsApp Cloud API testing. Run after login and after creating a customer with whatsappOptIn=true. Use a Meta test recipient first.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "zario_access_token", "value": "" },
+    { "key": "customer_id", "value": "" },
+    { "key": "message_id", "value": "" },
+    { "key": "wa_message_id", "value": "" },
+    { "key": "webhook_verify_token", "value": "" },
+    { "key": "whatsapp_phone_number_id", "value": "" },
+    { "key": "test_customer_wa_id", "value": "923001234567" }
+  ],
+  "item": [
+    {
+      "name": "1 - Verify Webhook Challenge",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token={{webhook_verify_token}}&hub.challenge=zario-test-challenge"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Challenge echoed', () => pm.expect(pm.response.text()).to.eql('zario-test-challenge'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - Send Text Message",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"text\": \"Assalam o alaikum! This is a Zario WhatsApp Cloud API test.\",\n  \"previewUrl\": false\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/messages/text"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "const message = pm.response.json().data.message;",
+              "pm.collectionVariables.set('message_id', message._id);",
+              "if (message.waMessageId) pm.collectionVariables.set('wa_message_id', message.waMessageId);",
+              "pm.test('Message marked sent', () => pm.expect(message.status).to.eql('sent'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - List Messages",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/messages?customerId={{customer_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Returns messages array', () => pm.expect(pm.response.json().data.messages).to.be.an('array'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Get Message",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/messages/{{message_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Message id matches', () => pm.expect(pm.response.json().data.message._id).to.eql(pm.collectionVariables.get('message_id')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - Simulate Inbound Webhook",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [\n    {\n      \"id\": \"test-waba-id\",\n      \"changes\": [\n        {\n          \"field\": \"messages\",\n          \"value\": {\n            \"messaging_product\": \"whatsapp\",\n            \"metadata\": {\n              \"display_phone_number\": \"{{test_customer_wa_id}}\",\n              \"phone_number_id\": \"{{whatsapp_phone_number_id}}\"\n            },\n            \"contacts\": [\n              {\n                \"profile\": { \"name\": \"Manual Webhook Customer\" },\n                \"wa_id\": \"{{test_customer_wa_id}}\"\n              }\n            ],\n            \"messages\": [\n              {\n                \"from\": \"{{test_customer_wa_id}}\",\n                \"id\": \"wamid.manual-inbound-{{$timestamp}}\",\n                \"timestamp\": \"{{$timestamp}}\",\n                \"type\": \"text\",\n                \"text\": { \"body\": \"Manual inbound webhook test\" }\n              }\n            ]\n          }\n        }\n      ]\n    }\n  ]\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/webhooks/whatsapp"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Webhook processed', () => pm.expect(pm.response.json().data.processed).to.be.greaterThan(0));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 - Simulate Delivery Status Webhook",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [\n    {\n      \"changes\": [\n        {\n          \"field\": \"messages\",\n          \"value\": {\n            \"metadata\": { \"phone_number_id\": \"{{whatsapp_phone_number_id}}\" },\n            \"statuses\": [\n              {\n                \"id\": \"{{wa_message_id}}\",\n                \"status\": \"delivered\",\n                \"timestamp\": \"{{$timestamp}}\"\n              }\n            ]\n          }\n        }\n      ]\n    }\n  ]\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/webhooks/whatsapp"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 - Message Analytics",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/messages/analytics"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has analytics', () => pm.expect(pm.response.json().data).to.have.property('analytics'));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

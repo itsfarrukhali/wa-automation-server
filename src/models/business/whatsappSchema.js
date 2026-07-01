@@ -153,9 +153,36 @@ whatsappSchema.methods.encryptToken = function (token) {
 };
 
 whatsappSchema.methods.decryptToken = function () {
-  // TODO: Implement decryption logic using the stored encrypted token, IV, and auth tag
-  // Implementation for decrypting stored token
-  // Returns decrypted token for API calls
+  if (!this.accessToken) return null;
+
+  let tokenPayload;
+  try {
+    tokenPayload =
+      typeof this.accessToken === "string"
+        ? JSON.parse(this.accessToken)
+        : this.accessToken;
+  } catch {
+    // Backward compatibility for any legacy/plain tokens stored before encryption.
+    return this.accessToken;
+  }
+
+  if (!tokenPayload?.encrypted || !tokenPayload?.iv || !tokenPayload?.tag) {
+    return typeof tokenPayload === "string" ? tokenPayload : null;
+  }
+
+  const algorithm = "aes-256-gcm";
+  const key = crypto.scryptSync(env.WHATSAPP_ENCRYPTION_KEY, "salt", 32);
+  const decipher = crypto.createDecipheriv(
+    algorithm,
+    key,
+    Buffer.from(tokenPayload.iv, "hex"),
+  );
+
+  decipher.setAuthTag(Buffer.from(tokenPayload.tag, "hex"));
+
+  let decrypted = decipher.update(tokenPayload.encrypted, "hex", "utf8");
+  decrypted += decipher.final("utf8");
+  return decrypted;
 };
 
 whatsappSchema.methods.isConnected = function () {

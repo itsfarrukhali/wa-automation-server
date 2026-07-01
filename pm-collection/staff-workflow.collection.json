@@ -1,0 +1,157 @@
+{
+  "info": {
+    "name": "Zario - Staff Workflow",
+    "_postman_id": "zario-staff-workflow-v1",
+    "description": "Manual QA collection for owner-managed staff accounts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "zario_access_token", "value": "" },
+    { "key": "staff_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1 - Create Staff",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sara Staff\",\n  \"email\": \"sara.staff@example.com\",\n  \"username\": \"sarastaff\",\n  \"password\": \"Password123!\",\n  \"phone\": \"03001234567\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/staff"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201 or duplicate/limit', () => pm.expect([201, 403, 409]).to.include(pm.response.code));",
+              "if (pm.response.code === 201) pm.collectionVariables.set('staff_id', pm.response.json().data._id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - List Staff",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/staff?page=1&limit=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has staff array', () => pm.expect(pm.response.json().data.staff).to.be.an('array'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Get Staff Detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/staff/{{staff_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or missing staff id', () => pm.expect([200, 404, 422]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Update Staff",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sara Staff Updated\",\n  \"phone\": \"03007654321\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/staff/{{staff_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or missing staff id', () => pm.expect([200, 404, 422]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - Deactivate Staff",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"isActive\": false\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/staff/{{staff_id}}/status"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or already inactive/missing staff id', () => pm.expect([200, 404, 409, 422]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 - Reset Staff Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"password\": \"NewPassword123!\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/staff/{{staff_id}}/reset-password"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or missing staff id', () => pm.expect([200, 404, 422]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

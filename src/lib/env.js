@@ -27,11 +27,30 @@ export const env = {
   REFRESH_TOKEN_EXPIRY_DAYS: optional("REFRESH_TOKEN_EXPIRY_DAYS", "7"),
   BCRYPT_SALT_ROUNDS: parseInt(optional("BCRYPT_SALT_ROUNDS", "12")),
 
+  // Rate limiting
+  RATE_LIMIT_ENABLED: optional(
+    "RATE_LIMIT_ENABLED",
+    optional("NODE_ENV", "development") === "test" ? "false" : "true",
+  ),
+  RATE_LIMIT_WINDOW_MS: parseInt(optional("RATE_LIMIT_WINDOW_MS", "60000")),
+  RATE_LIMIT_MAX: parseInt(optional("RATE_LIMIT_MAX", "300")),
+  AUTH_RATE_LIMIT_MAX: parseInt(optional("AUTH_RATE_LIMIT_MAX", "20")),
+  WHATSAPP_RATE_LIMIT_MAX: parseInt(optional("WHATSAPP_RATE_LIMIT_MAX", "60")),
+
   // WhatsApp Meta Cloud API
-  WA_TOKEN: required("WA_TOKEN"),
-  WA_PHONE_ID: required("WA_PHONE_ID"),
-  WEBHOOK_VERIFY_TOKEN: required("WEBHOOK_VERIFY_TOKEN"),
-  WHATSAPP_ENCRYPTION_KEY: required("WHATSAPP_ENCRYPTION_KEY"),
+  WA_TOKEN: optional("WA_TOKEN"),
+  WA_PHONE_ID: optional("WA_PHONE_ID"),
+  WHATSAPP_GRAPH_VERSION: optional("WHATSAPP_GRAPH_VERSION", "v20.0"),
+  WEBHOOK_VERIFY_TOKEN: optional("WEBHOOK_VERIFY_TOKEN"),
+  WHATSAPP_ENCRYPTION_KEY: optional("WHATSAPP_ENCRYPTION_KEY"),
+
+  // Background workers
+  ENABLE_SCHEDULER_WORKER: optional("ENABLE_SCHEDULER_WORKER", "false"),
+  SCHEDULER_INTERVAL_SECONDS: parseInt(
+    optional("SCHEDULER_INTERVAL_SECONDS", "60"),
+  ),
+  SCHEDULER_BATCH_LIMIT: parseInt(optional("SCHEDULER_BATCH_LIMIT", "25")),
+  SCHEDULER_LOCK_SECONDS: parseInt(optional("SCHEDULER_LOCK_SECONDS", "120")),
 
   // Frontend URL for CORS
   CLIENT_URL: optional("CLIENT_URL", "http://localhost:5173"),

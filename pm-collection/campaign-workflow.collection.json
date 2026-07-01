@@ -1,0 +1,249 @@
+{
+  "info": {
+    "name": "Zario - Campaign Workflow",
+    "_postman_id": "zario-campaign-workflow-v1",
+    "description": "Manual QA collection for backend campaign APIs. Prerequisites: login as owner/staff, complete business onboarding, connect WhatsApp, and create at least one opted-in customer.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "zario_access_token", "value": "" },
+    { "key": "campaign_id", "value": "" },
+    { "key": "cloned_campaign_id", "value": "" },
+    { "key": "customer_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1 - Create Campaign Draft",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"VIP Eid Offer\",\n  \"description\": \"Promo campaign for opted-in VIP customers\",\n  \"type\": \"promo\",\n  \"target\": {\n    \"tags\": [\"vip\"]\n  },\n  \"message\": \"Assalam o alaikum {{name}}! {{business}} has a special VIP Eid offer for you. Reply YES for details.\",\n  \"whatsappTemplate\": {\n    \"templateName\": \"vip_eid_offer\",\n    \"language\": \"en\",\n    \"category\": \"MARKETING\"\n  },\n  \"tags\": [\"eid\", \"vip\"]\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/campaigns"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "const data = pm.response.json().data;",
+              "pm.test('Campaign created', () => pm.expect(data.campaign).to.have.property('_id'));",
+              "pm.collectionVariables.set('campaign_id', data.campaign._id);",
+              "console.log('Estimated recipients:', data.preview.estimatedRecipients);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - List Campaigns",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/campaigns?page=1&limit=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has campaign list', () => pm.expect(pm.response.json().data.campaigns).to.be.an('array'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Preview Campaign Recipients",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"campaignId\": \"{{campaign_id}}\",\n  \"limit\": 25\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/campaigns/preview"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json().data;",
+              "pm.test('Has total', () => pm.expect(data.total).to.be.a('number'));",
+              "console.log('Recipients:', data.recipients);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Dry Run Launch",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dryRun\": true,\n  \"sendMode\": \"text\",\n  \"allowPartial\": false\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/campaigns/{{campaign_id}}/launch"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json().data;",
+              "pm.test('Dry run true', () => pm.expect(data.dryRun).to.eql(true));",
+              "console.log('Launch preview:', data.preview);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - Launch Campaign Real Send",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dryRun\": false,\n  \"sendMode\": \"text\",\n  \"allowPartial\": false\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/campaigns/{{campaign_id}}/launch",
+        "description": "This sends real WhatsApp messages if real Meta credentials are configured. Use dry-run first."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or provider/config error', () => pm.expect([200, 403, 422, 502]).to.include(pm.response.code));",
+              "if (pm.response.code === 200) {",
+              "  const data = pm.response.json().data;",
+              "  pm.test('Processed count exists', () => pm.expect(data.processed).to.be.a('number'));",
+              "  console.log('Campaign result:', { sent: data.sent, failed: data.failed });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 - Get Campaign Detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/campaigns/{{campaign_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has metrics', () => pm.expect(pm.response.json().data).to.have.property('metrics'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 - Campaign Analytics",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/campaigns/analytics?days=30"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has totals', () => pm.expect(pm.response.json().data).to.have.property('totals'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 - Clone Campaign",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"VIP Eid Offer Copy\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/campaigns/{{campaign_id}}/clone"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201 or plan limit', () => pm.expect([201, 403]).to.include(pm.response.code));",
+              "if (pm.response.code === 201) {",
+              "  pm.collectionVariables.set('cloned_campaign_id', pm.response.json().data._id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9 - Cancel Cloned Campaign",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{zario_access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Manual QA cleanup\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/campaigns/{{cloned_campaign_id}}/cancel"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or missing cloned id', () => pm.expect([200, 404, 422]).to.include(pm.response.code));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

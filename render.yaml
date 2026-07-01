@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: zario-backend
+    env: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/ready
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: ENABLE_SCHEDULER_WORKER
+        value: "true"
+      - key: SCHEDULER_INTERVAL_SECONDS
+        value: "60"
+      - key: SCHEDULER_BATCH_LIMIT
+        value: "25"
+      - key: SCHEDULER_LOCK_SECONDS
+        value: "120"
+      - key: WHATSAPP_GRAPH_VERSION
+        value: v20.0
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_ENCRYPTION_KEY
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: WA_TOKEN
+        sync: false
+      - key: WA_PHONE_ID
+        sync: false
