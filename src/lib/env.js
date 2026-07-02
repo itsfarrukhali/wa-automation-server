@@ -54,6 +54,8 @@ export const env = {
 
   // Frontend URL for CORS
   CLIENT_URL: optional("CLIENT_URL", "http://localhost:5173"),
+  CORS_ALLOWED_ORIGINS: optional("CORS_ALLOWED_ORIGINS"),
+  ALLOW_LOCAL_ORIGINS: optional("ALLOW_LOCAL_ORIGINS", "false"),
 
   // Claude API (for AI features)
   ANTHROPIC_API_KEY: optional("ANTHROPIC_API_KEY"),

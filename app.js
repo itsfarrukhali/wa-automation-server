@@ -39,9 +39,18 @@ const allowedOrigins = new Set();
 const allowLocalOrigins =
   env.NODE_ENV !== "production" || env.ALLOW_LOCAL_ORIGINS === "true";
 
-if (env.CLIENT_URL) {
-  allowedOrigins.add(env.CLIENT_URL);
-}
+const addConfiguredOrigins = (value) => {
+  String(value || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+    .filter((origin) => !["true", "false"].includes(origin.toLowerCase()))
+    .forEach((origin) => allowedOrigins.add(origin));
+};
+
+addConfiguredOrigins(env.CLIENT_URL);
+addConfiguredOrigins(env.CORS_ALLOWED_ORIGINS);
+addConfiguredOrigins(env.ALLOW_LOCAL_ORIGINS);
 
 if (allowLocalOrigins) {
   allowedOrigins.add("http://localhost:3000");
@@ -55,8 +64,14 @@ const isLocalDevOrigin = (origin) =>
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow local tools (Postman, curl) and file:// testing in development.
-      if ((!origin || origin === "null") && env.NODE_ENV !== "production") {
+      // Allow server-to-server/internal health checks plus tools like Postman/curl.
+      // CORS is a browser protection; requests with no Origin header are not browser CORS requests.
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Allow file:// testing only outside production.
+      if (origin === "null" && env.NODE_ENV !== "production") {
         return callback(null, true);
       }
 
