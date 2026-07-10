@@ -53,8 +53,8 @@ const REFRESH_EXPIRY_DAYS = parseInt(env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
 
 export const refreshCookieOptions = {
   httpOnly: true,
-  secure: env.NODE_ENV === "production",
-  sameSite: env.NODE_ENV === "production" ? "strict" : "lax",
+  secure: true,
+  sameSite: env.NODE_ENV === "production" ? "none" : "lax",
   maxAge: REFRESH_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
   path: "/api/v1/auth",
 };

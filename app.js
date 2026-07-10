@@ -120,7 +120,7 @@ app.get("/", (_req, res) => {
   ApiResponseUtil.success(
     res,
     { status: "live", timestamp: new Date().toISOString(), version: "1.0.0" },
-    "🚀 Replyo Server is Live!",
+    "🚀 Zario Server is Live!",
   );
 });
 app.get("/api/health", (_req, res) => {
