@@ -100,16 +100,20 @@ const getLocalScheduleParts = (date, timezone) => {
     hourCycle: "h23",
   }).formatToParts(date);
 
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const values = Object.fromEntries(
+    parts.map(({ type, value }) => [type, value]),
+  );
   return {
     day: values.weekday.toLowerCase().slice(0, 3),
     minutes: Number(values.hour) * 60 + Number(values.minute),
   };
 };
 
-const parseTime = (value) => {
+const parseTime = (value, role = "open") => {
   const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
+  const total = hours * 60 + minutes;
+  if (role === "close" && total === 0) return 24 * 60;
+  return total;
 };
 
 const assertWithinWorkingHours = (business, scheduledAt, duration) => {
@@ -125,8 +129,8 @@ const assertWithinWorkingHours = (business, scheduledAt, duration) => {
 
   const appointmentEnd = minutes + duration;
   if (
-    minutes < parseTime(hours.openTime) ||
-    appointmentEnd > parseTime(hours.closeTime)
+    minutes < parseTime(hours.openTime, "open") ||
+    appointmentEnd > parseTime(hours.closeTime, "close")
   ) {
     throw new AppError(
       `Booking must fit within business hours (${hours.openTime}-${hours.closeTime}).`,
@@ -196,9 +200,7 @@ const buildBookingData = ({
     phone: customer.phone,
     whatsappNumber: customer.whatsappNumber,
   },
-  staffDetails: staff
-    ? { name: staff.name, phone: staff.phone }
-    : undefined,
+  staffDetails: staff ? { name: staff.name, phone: staff.phone } : undefined,
   timeSlot: {
     startTime: scheduledAt,
     endTime: new Date(scheduledAt.getTime() + service.duration * 60 * 1000),
@@ -231,7 +233,8 @@ export const createBooking = async (userId, data) => {
     getServiceForBusiness(businessId, data.serviceId),
   ]);
   const staff = await getStaffForBusiness(businessId, data.staffId, service);
-  const totalAmount = data.totalAmount ?? service.discountedPrice ?? service.price;
+  const totalAmount =
+    data.totalAmount ?? service.discountedPrice ?? service.price;
   if ((data.amountPaid || 0) > totalAmount) {
     throw new AppError("amountPaid cannot exceed totalAmount", 422);
   }
@@ -360,7 +363,11 @@ export const updateBooking = async (userId, bookingId, updates) => {
   const { business, businessId } = await getBusinessContext(userId);
   const booking = await findBookingForBusiness(businessId, bookingId);
 
-  if (["completed", "cancelled", "no_show", "rescheduled"].includes(booking.status)) {
+  if (
+    ["completed", "cancelled", "no_show", "rescheduled"].includes(
+      booking.status,
+    )
+  ) {
     throw new AppError("Terminal bookings cannot be edited.", 409);
   }
 
@@ -473,11 +480,7 @@ export const updateBookingStatus = async (
   return booking;
 };
 
-export const rescheduleBooking = async (
-  userId,
-  bookingId,
-  newScheduledAt,
-) => {
+export const rescheduleBooking = async (userId, bookingId, newScheduledAt) => {
   const { business, businessId } = await getBusinessContext(userId);
   const booking = await findBookingForBusiness(businessId, bookingId);
   if (!["pending", "confirmed"].includes(booking.status)) {

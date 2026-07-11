@@ -96,7 +96,8 @@ workingHoursSchema.methods.isOpenAt = function (date = new Date()) {
   }
 
   // Check regular hours
-  if (timeStr < this.openTime || timeStr > this.closeTime) {
+  const effectiveClose = this.closeTime === "00:00" ? "23:59" : this.closeTime;
+  if (timeStr < this.openTime || timeStr > effectiveClose) {
     return false;
   }
 
