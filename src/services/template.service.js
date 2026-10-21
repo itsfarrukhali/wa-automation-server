@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
-import { env } from "../lib/env.js";
 import Business from "../models/business/business.model.js";
 import { getMyBusiness } from "./business.service.js";
+import { resolveWhatsAppManagementCredentials } from "./whatsappCredentials.service.js";
 import { AppError } from "../utils/helpers/errorHandler.utils.js";
 import { fetchWhatsAppTemplates } from "../utils/whatsapp/sendMessage.utils.js";
 
@@ -19,25 +19,6 @@ const normalizeTemplateName = (name) =>
 
 const getBusinessWithSecrets = (userId) =>
   getMyBusiness(userId, "+whatsapp.accessToken +whatsapp.wabaId");
-
-const resolveWhatsAppCredentials = (business) => {
-  let accessToken = null;
-  try {
-    accessToken = business.whatsapp?.decryptToken?.();
-  } catch (error) {
-    if (!env.WA_TOKEN) {
-      throw new AppError(
-        "Stored WhatsApp token could not be decrypted. Reconnect WhatsApp with the current WHATSAPP_ENCRYPTION_KEY.",
-        422,
-      );
-    }
-  }
-
-  return {
-    wabaId: business.whatsapp?.wabaId,
-    accessToken: accessToken || env.WA_TOKEN,
-  };
-};
 
 const serializeTemplate = (template) => ({
   id: template._id,
@@ -156,7 +137,7 @@ const mapMetaTemplate = (template) => ({
 
 export const syncTemplatesFromMeta = async (userId) => {
   const business = await getBusinessWithSecrets(userId);
-  const credentials = resolveWhatsAppCredentials(business);
+  const credentials = resolveWhatsAppManagementCredentials(business);
 
   if (!credentials.wabaId || !credentials.accessToken) {
     throw new AppError(

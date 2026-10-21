@@ -3,8 +3,8 @@ import Business from "../models/business/business.model.js";
 import Campaign from "../models/campaign.model.js";
 import Customer from "../models/customer.model.js";
 import MessageLog from "../models/messagelog.model.js";
-import { env } from "../lib/env.js";
 import { getMyBusiness } from "./business.service.js";
+import { resolveWhatsAppMessagingCredentials } from "./whatsappCredentials.service.js";
 import { AppError } from "../utils/helpers/errorHandler.utils.js";
 import {
   buildTemplatePayload,
@@ -33,29 +33,6 @@ const ensureObjectId = (id, label) => {
 
 const getBusinessWithSecrets = (userId) =>
   getMyBusiness(userId, "+whatsapp.accessToken +whatsapp.wabaId");
-
-const resolveWhatsAppCredentials = (business) => {
-  const phoneNumberId = business.whatsapp?.phoneNumberId || env.WA_PHONE_ID;
-  let businessAccessToken = null;
-
-  try {
-    businessAccessToken = business.whatsapp?.decryptToken?.();
-  } catch (error) {
-    if (!env.WA_TOKEN) {
-      throw new AppError(
-        "Stored WhatsApp token could not be decrypted. Reconnect WhatsApp with the current WHATSAPP_ENCRYPTION_KEY.",
-        422,
-      );
-    }
-  }
-
-  const accessToken = businessAccessToken || env.WA_TOKEN;
-  if (!phoneNumberId || !accessToken) {
-    throw new AppError("WhatsApp is not fully connected.", 422);
-  }
-
-  return { phoneNumberId, accessToken };
-};
 
 const getCampaignForBusiness = async (businessId, campaignId) => {
   ensureObjectId(campaignId, "campaign ID");
@@ -417,7 +394,7 @@ export const launchCampaign = async (
     };
   }
 
-  const credentials = resolveWhatsAppCredentials(business);
+  const credentials = resolveWhatsAppMessagingCredentials(business);
   campaign.status = "sending";
   campaign.execution.startedAt = new Date();
   campaign.metrics.totalTargeted = recipients.length;

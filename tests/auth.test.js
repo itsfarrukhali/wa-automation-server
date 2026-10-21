@@ -109,6 +109,7 @@ before(async () => {
 
   // Set required env vars before importing app
   process.env.NODE_ENV = "development";
+  process.env.RATE_LIMIT_ENABLED = "false";
   process.env.JWT_ACCESS_SECRET = "test_jwt_access_secret_for_ci_only";
   process.env.JWT_REFRESH_SECRET = "test_jwt_refresh_secret_for_ci_only";
   process.env.JWT_EXPIRES_IN = "15m";

@@ -36,12 +36,23 @@ export const env = {
   RATE_LIMIT_MAX: parseInt(optional("RATE_LIMIT_MAX", "300")),
   AUTH_RATE_LIMIT_MAX: parseInt(optional("AUTH_RATE_LIMIT_MAX", "20")),
   WHATSAPP_RATE_LIMIT_MAX: parseInt(optional("WHATSAPP_RATE_LIMIT_MAX", "60")),
+  TRUST_PROXY_HOPS: parseInt(
+    optional(
+      "TRUST_PROXY_HOPS",
+      optional("NODE_ENV", "development") === "production" ? "1" : "0",
+    ),
+  ),
 
   // WhatsApp Meta Cloud API
   WA_TOKEN: optional("WA_TOKEN"),
   WA_PHONE_ID: optional("WA_PHONE_ID"),
   WHATSAPP_GRAPH_VERSION: optional("WHATSAPP_GRAPH_VERSION", "v20.0"),
+  META_APP_SECRET: optional("META_APP_SECRET"),
   WEBHOOK_VERIFY_TOKEN: optional("WEBHOOK_VERIFY_TOKEN"),
+  WEBHOOK_SIGNATURE_REQUIRED: optional(
+    "WEBHOOK_SIGNATURE_REQUIRED",
+    optional("NODE_ENV", "development") === "production" ? "true" : "false",
+  ),
   WHATSAPP_ENCRYPTION_KEY: optional("WHATSAPP_ENCRYPTION_KEY"),
 
   // Background workers
@@ -60,7 +71,12 @@ export const env = {
   // Claude API (for AI features)
   ANTHROPIC_API_KEY: optional("ANTHROPIC_API_KEY"),
 
-  // Upstash Redis (for BullMQ)
+  // Redis. Upstash's Redis-compatible TLS URL can be used here.
+  REDIS_URL: optional("REDIS_URL"),
+  REDIS_KEY_PREFIX: optional("REDIS_KEY_PREFIX", "zario"),
+  RATE_LIMIT_FAIL_OPEN: optional("RATE_LIMIT_FAIL_OPEN", "true"),
+
+  // Legacy Upstash REST settings; retained for deployment migration only.
   UPSTASH_REDIS_URL: optional("UPSTASH_REDIS_URL"),
   UPSTASH_REDIS_TOKEN: optional("UPSTASH_REDIS_TOKEN"),
 

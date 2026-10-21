@@ -4,6 +4,7 @@ import MessageLog from "../models/messagelog.model.js";
 import SchedulerLock from "../models/schedulerLock.model.js";
 import { env } from "../lib/env.js";
 import { getMyBusiness } from "./business.service.js";
+import { resolveWhatsAppMessagingCredentials } from "./whatsappCredentials.service.js";
 import { AppError } from "../utils/helpers/errorHandler.utils.js";
 import {
   buildTextPayload,
@@ -15,25 +16,6 @@ const LOCK_KEY = "whatsapp_scheduler";
 
 const getBusinessWithSecrets = (userId) =>
   getMyBusiness(userId, "+whatsapp.accessToken +whatsapp.wabaId");
-
-const resolveWhatsAppCredentials = (business) => {
-  const phoneNumberId = business.whatsapp?.phoneNumberId || env.WA_PHONE_ID;
-  let businessAccessToken = null;
-
-  try {
-    businessAccessToken = business.whatsapp?.decryptToken?.();
-  } catch {
-    businessAccessToken = null;
-  }
-
-  const accessToken = businessAccessToken || env.WA_TOKEN;
-
-  if (!phoneNumberId || !accessToken) {
-    throw new AppError("WhatsApp is not fully connected.", 422);
-  }
-
-  return { phoneNumberId, accessToken };
-};
 
 const formatDateTime = (date, timezone = "Asia/Karachi") =>
   new Intl.DateTimeFormat("en-PK", {
@@ -146,7 +128,7 @@ const sendScheduledMessage = async ({ business, booking, kind }) => {
 
   try {
     const response = await sendWhatsAppMessage({
-      ...resolveWhatsAppCredentials(business),
+      ...resolveWhatsAppMessagingCredentials(business),
       payload: buildTextPayload({
         to: recipient,
         text: content,

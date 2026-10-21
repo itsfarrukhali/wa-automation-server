@@ -12,6 +12,8 @@ services:
         value: production
       - key: PORT
         value: 5000
+      - key: TRUST_PROXY_HOPS
+        value: "1"
       - key: ENABLE_SCHEDULER_WORKER
         value: "true"
       - key: SCHEDULER_INTERVAL_SECONDS
@@ -30,8 +32,16 @@ services:
         sync: false
       - key: WEBHOOK_VERIFY_TOKEN
         sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: WEBHOOK_SIGNATURE_REQUIRED
+        value: "true"
       - key: WHATSAPP_ENCRYPTION_KEY
         sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_KEY_PREFIX
+        value: zario
       - key: CLIENT_URL
         sync: false
       - key: GMAIL_USER

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import Business from "../models/business/business.model.js";
 import Customer from "../models/customer.model.js";
 import MessageLog from "../models/messagelog.model.js";
@@ -29,6 +30,32 @@ const OPT_OUT_KEYWORDS = new Set([
 
 const normalizeInboundText = (text = "") =>
   String(text).trim().replace(/\s+/g, " ").toLowerCase();
+
+export const verifyWhatsAppWebhookSignature = ({ signature, rawBody }) => {
+  if (env.WEBHOOK_SIGNATURE_REQUIRED !== "true") return true;
+  if (!env.META_APP_SECRET) {
+    throw new AppError("WhatsApp webhook signature is not configured.", 500);
+  }
+  if (!signature || !rawBody) {
+    throw new AppError("Missing WhatsApp webhook signature.", 401);
+  }
+
+  const expected = `sha256=${crypto
+    .createHmac("sha256", env.META_APP_SECRET)
+    .update(rawBody)
+    .digest("hex")}`;
+  const suppliedBuffer = Buffer.from(String(signature));
+  const expectedBuffer = Buffer.from(expected);
+
+  if (
+    suppliedBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(suppliedBuffer, expectedBuffer)
+  ) {
+    throw new AppError("Invalid WhatsApp webhook signature.", 401);
+  }
+
+  return true;
+};
 
 export const verifyWhatsAppWebhook = (query = {}) => {
   const mode = query["hub.mode"];
@@ -82,7 +109,7 @@ const findBusinessFromChange = async (change) => {
   return Business.findOne({
     "whatsapp.phoneNumberId": String(phoneNumberId),
     isActive: true,
-  });
+  }).select("+whatsapp.accessToken +whatsapp.wabaId");
 };
 
 const recordWebhookEvent = async (businessId, event, data = {}) => {
@@ -125,16 +152,27 @@ const findOrCreateCustomer = async ({ businessId, contact, from }) => {
     return customer;
   }
 
-  customer = await Customer.create({
-    businessId,
-    name: profileName || `WhatsApp ${normalizeWhatsAppPhone(waId)}`,
-    phone: e164,
-    whatsappNumber: e164,
-    waProfileName: profileName,
-    source: "whatsapp",
-    whatsappOptIn: true,
-    consentGiven: true,
-  });
+  try {
+    customer = await Customer.create({
+      businessId,
+      name: profileName || `WhatsApp ${normalizeWhatsAppPhone(waId)}`,
+      phone: e164,
+      whatsappNumber: e164,
+      waProfileName: profileName,
+      source: "whatsapp",
+      whatsappOptIn: true,
+      consentGiven: true,
+    });
+  } catch (error) {
+    if (error?.code !== 11000) throw error;
+    customer = await Customer.findOne({
+      businessId,
+      status: { $ne: "deleted" },
+      deletedAt: null,
+      $or: [{ phone: e164 }, { whatsappNumber: e164 }],
+    });
+    if (!customer) throw error;
+  }
 
   return customer;
 };
@@ -165,26 +203,35 @@ const processInboundMessage = async ({ business, value, message }) => {
   const normalizedText = normalizeInboundText(content);
   const isOptOut = OPT_OUT_KEYWORDS.has(normalizedText);
 
-  const log = await MessageLog.create({
-    businessId: business._id,
-    customerId: customer._id,
-    type: message.context ? "inbound_reply" : "inbound",
-    direction: "in",
-    contentType: contentTypeForInbound(message.type),
-    content,
-    status: "delivered",
-    waMessageId: message.id,
-    waBusinessPhone: value.metadata?.display_phone_number,
-    waCustomerPhone: toE164PakistanPhone(message.from),
-    sentAt: timestamp,
-    context: message.context ? { replyToWaMessageId: message.context.id } : undefined,
-    requiredHumanIntervention: !isOptOut,
-    isAutomated: false,
-    aiMetadata: {
-      intent: isOptOut ? "opt_out" : undefined,
-      entities: [],
-    },
-  });
+  let log;
+  try {
+    log = await MessageLog.create({
+      businessId: business._id,
+      customerId: customer._id,
+      type: message.context ? "inbound_reply" : "inbound",
+      direction: "in",
+      contentType: contentTypeForInbound(message.type),
+      content,
+      status: "delivered",
+      waMessageId: message.id,
+      waBusinessPhone: value.metadata?.display_phone_number,
+      waCustomerPhone: toE164PakistanPhone(message.from),
+      sentAt: timestamp,
+      context: message.context
+        ? { replyToWaMessageId: message.context.id }
+        : undefined,
+      requiredHumanIntervention: !isOptOut,
+      isAutomated: false,
+      aiMetadata: {
+        intent: isOptOut ? "opt_out" : undefined,
+        entities: [],
+      },
+    });
+  } catch (error) {
+    if (error?.code !== 11000) throw error;
+    const duplicate = await MessageLog.findOne({ waMessageId: message.id });
+    return { action: "duplicate_inbound", messageId: duplicate?._id };
+  }
 
   await Customer.updateOne(
     { _id: customer._id },
@@ -257,6 +304,24 @@ const processStatusUpdate = async ({ business, status }) => {
   }
 
   const previousStatus = message.status;
+  if (previousStatus === mappedStatus) {
+    return {
+      action: "duplicate_status",
+      waMessageId: status.id,
+      status: mappedStatus,
+    };
+  }
+
+  const statusRank = { pending: 0, sent: 1, delivered: 2, read: 3, failed: 4 };
+  if ((statusRank[previousStatus] ?? -1) > (statusRank[mappedStatus] ?? -1)) {
+    return {
+      action: "stale_status_ignored",
+      waMessageId: status.id,
+      status: mappedStatus,
+      currentStatus: previousStatus,
+    };
+  }
+
   await message.updateFromWebhook({
     status: mappedStatus,
     timestamp: status.timestamp,

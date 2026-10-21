@@ -17,6 +17,7 @@
 
 import Business from "../models/business/business.model.js";
 import User from "../models/user.model.js";
+import { env } from "../lib/env.js";
 import { AppError } from "../utils/helpers/errorHandler.utils.js";
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -306,6 +307,41 @@ export const completeStep5WhatsApp = async (userId, data) => {
   business.markModified("whatsapp");
 
   advanceOnboardingStep(business, 5);
+  await business.save();
+  return business;
+};
+
+export const reconnectWhatsApp = async (userId, data) => {
+  const business = await getOwnedBusiness(userId);
+  const { phoneNumberId, wabaId, accessToken } = data;
+
+  const response = await fetch(
+    `https://graph.facebook.com/${env.WHATSAPP_GRAPH_VERSION}/${encodeURIComponent(phoneNumberId)}?fields=id,display_phone_number,verified_name,quality_rating`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  const result = await response.json();
+
+  if (!response.ok || String(result.id) !== String(phoneNumberId)) {
+    throw new AppError(
+      result?.error?.message ||
+        "Meta could not verify this token and Phone Number ID.",
+      422,
+    );
+  }
+
+  const encrypted = business.whatsapp.encryptToken(accessToken);
+  business.whatsapp.phoneNumberId = String(phoneNumberId);
+  business.whatsapp.wabaId = String(wabaId);
+  business.whatsapp.accessToken = JSON.stringify(encrypted);
+  business.whatsapp.displayPhoneNumber = result.display_phone_number;
+  business.whatsapp.verifiedName = result.verified_name;
+  business.whatsapp.qualityRating = result.quality_rating || "UNKNOWN";
+  business.whatsapp.tokenExpiresAt = null;
+  business.whatsapp.connectionStatus = "connected";
+  business.whatsapp.connectionError = undefined;
+  business.whatsapp.lastConnectedAt = new Date();
+  business.whatsappVerified = true;
+  business.markModified("whatsapp");
   await business.save();
   return business;
 };

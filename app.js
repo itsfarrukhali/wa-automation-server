@@ -12,6 +12,7 @@ import { auditRequests } from "./src/middlewares/audit.middleware.js";
 import { rateLimit } from "./src/middlewares/rateLimit.middleware.js";
 import { requestLogger } from "./src/middlewares/requestLogger.middleware.js";
 import logger from "./src/lib/logger.js";
+import { isRedisConfigured, pingRedis } from "./src/lib/redis.js";
 import userRouter from "./src/routes/api/v1/auth.routes.js";
 import businessRouter from "./src/routes/api/v1/business.routes.js";
 import customerRouter from "./src/routes/api/v1/customer.routes.js";
@@ -31,6 +32,10 @@ import adminRouter, {
 } from "./src/routes/api/v1/admin.routes.js";
 
 const app = express();
+
+if (env.TRUST_PROXY_HOPS > 0) {
+  app.set("trust proxy", env.TRUST_PROXY_HOPS);
+}
 
 app.use(attachRequestId);
 app.use(securityHeaders);
@@ -97,7 +102,16 @@ app.use(
 // Order matters: cookieParser before body parsers
 
 app.use(cookieParser());
-app.use(express.json({ limit: "10mb" }));
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req, _res, buffer) => {
+      if (req.originalUrl?.startsWith("/api/v1/webhooks/whatsapp")) {
+        req.rawBody = Buffer.from(buffer);
+      }
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(rateLimit);
 app.use(auditRequests);
@@ -134,9 +148,17 @@ app.get("/api/health", (_req, res) => {
     "Server is healthy",
   );
 });
-app.get("/api/ready", (_req, res) => {
+app.get("/api/ready", async (_req, res) => {
   const mongoReady = mongoose.connection.readyState === 1;
-  const ready = mongoReady;
+  let redisReady = !isRedisConfigured();
+  if (isRedisConfigured()) {
+    try {
+      redisReady = await pingRedis();
+    } catch {
+      redisReady = false;
+    }
+  }
+  const ready = mongoReady && redisReady;
 
   return res.status(ready ? 200 : 503).json({
     success: ready,
@@ -145,6 +167,11 @@ app.get("/api/ready", (_req, res) => {
       status: ready ? "ready" : "not_ready",
       checks: {
         mongo: mongoReady ? "connected" : "disconnected",
+        redis: isRedisConfigured()
+          ? redisReady
+            ? "connected"
+            : "disconnected"
+          : "not_configured",
       },
       timestamp: new Date().toISOString(),
     },
@@ -187,16 +214,21 @@ app.use((err, _req, res, _next) => {
     }
   }
 
-  logger.error("unhandled_error", {
+  const errorContext = {
     requestId: _req.requestId,
     statusCode,
     message,
-    stack: err.stack,
     isOperational: err?.isOperational,
     path: _req.originalUrl || _req.path,
     method: _req.method,
     actorId: _req.user?.userId,
-  });
+  };
+
+  if (statusCode >= 500) {
+    logger.error("unhandled_error", { ...errorContext, stack: err.stack });
+  } else {
+    logger.warn("request_error", errorContext);
+  }
 
   res.status(statusCode).json({
     success: false,

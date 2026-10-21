@@ -1,13 +1,13 @@
 import { env } from "../lib/env.js";
+import logger from "../lib/logger.js";
+import { ensureRedisConnected } from "../lib/redis.js";
 
 const buckets = new Map();
 
 const getClientKey = (req) => {
-  const forwardedFor = req.headers["x-forwarded-for"];
-  const ip =
-    typeof forwardedFor === "string"
-      ? forwardedFor.split(",")[0].trim()
-      : req.ip || req.socket?.remoteAddress || "unknown";
+  // Express resolves req.ip according to the app's trust-proxy setting. Reading
+  // X-Forwarded-For directly lets a client choose a new bucket on every request.
+  const ip = req.ip || req.socket?.remoteAddress || "unknown";
 
   if (req.user?.userId) return `user:${req.user.userId}`;
   return `ip:${ip}`;
@@ -39,41 +39,79 @@ const shouldSkip = (req) => {
   return false;
 };
 
-export const rateLimit = (req, res, next) => {
-  if (shouldSkip(req)) return next();
+const REDIS_RATE_LIMIT_SCRIPT = `
+local current = redis.call("INCR", KEYS[1])
+if current == 1 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+local ttl = redis.call("PTTL", KEYS[1])
+return { current, ttl }
+`;
 
+const setRateLimitHeaders = (res, limit, count, resetAt) => {
+  res.setHeader("x-ratelimit-limit", limit);
+  res.setHeader("x-ratelimit-remaining", Math.max(limit - count, 0));
+  res.setHeader("x-ratelimit-reset", Math.ceil(resetAt / 1000));
+};
+
+const rejectLimitedRequest = (req, res) =>
+  res.status(429).json({
+    success: false,
+    message: "Too many requests. Please try again shortly.",
+    requestId: req.requestId,
+  });
+
+const applyMemoryLimit = (req, res, next, key, limit, windowMs) => {
   const now = Date.now();
-  const windowMs = env.RATE_LIMIT_WINDOW_MS;
-  const limit = resolveLimit(req);
-  const key = `${getClientKey(req)}:${req.path}`;
   const current = buckets.get(key);
 
   if (!current || current.resetAt <= now) {
-    buckets.set(key, {
-      count: 1,
-      resetAt: now + windowMs,
-    });
-    res.setHeader("x-ratelimit-limit", limit);
-    res.setHeader("x-ratelimit-remaining", Math.max(limit - 1, 0));
-    res.setHeader("x-ratelimit-reset", Math.ceil((now + windowMs) / 1000));
+    buckets.set(key, { count: 1, resetAt: now + windowMs });
+    setRateLimitHeaders(res, limit, 1, now + windowMs);
     return next();
   }
 
   current.count += 1;
-  const remaining = Math.max(limit - current.count, 0);
-  res.setHeader("x-ratelimit-limit", limit);
-  res.setHeader("x-ratelimit-remaining", remaining);
-  res.setHeader("x-ratelimit-reset", Math.ceil(current.resetAt / 1000));
+  setRateLimitHeaders(res, limit, current.count, current.resetAt);
+  if (current.count > limit) return rejectLimitedRequest(req, res);
+  return next();
+};
 
-  if (current.count > limit) {
-    return res.status(429).json({
-      success: false,
-      message: "Too many requests. Please try again shortly.",
+export const rateLimit = async (req, res, next) => {
+  if (shouldSkip(req)) return next();
+
+  const windowMs = env.RATE_LIMIT_WINDOW_MS;
+  const limit = resolveLimit(req);
+  const key = `${getClientKey(req)}:${req.path}`;
+
+  try {
+    const redis = await ensureRedisConnected();
+    if (!redis) {
+      return applyMemoryLimit(req, res, next, key, limit, windowMs);
+    }
+
+    const redisKey = `${env.REDIS_KEY_PREFIX}:rate-limit:${key}`;
+    const [count, ttl] = await redis.eval(
+      REDIS_RATE_LIMIT_SCRIPT,
+      1,
+      redisKey,
+      windowMs,
+    );
+    const safeTtl = Number(ttl) > 0 ? Number(ttl) : windowMs;
+    setRateLimitHeaders(res, limit, Number(count), Date.now() + safeTtl);
+
+    if (Number(count) > limit) return rejectLimitedRequest(req, res);
+    return next();
+  } catch (error) {
+    logger.error("rate_limit_store_failed", {
+      message: error.message,
+      path: req.path,
       requestId: req.requestId,
     });
-  }
 
-  return next();
+    if (env.RATE_LIMIT_FAIL_OPEN === "false") return next(error);
+    return applyMemoryLimit(req, res, next, key, limit, windowMs);
+  }
 };
 
 setInterval(() => {

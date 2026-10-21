@@ -147,6 +147,18 @@ export const updateSettings = asyncHandler(async (req, res) => {
   );
 });
 
+export const reconnectWhatsApp = asyncHandler(async (req, res) => {
+  const business = await BusinessService.reconnectWhatsApp(
+    req.user.userId,
+    req.body,
+  );
+  return ApiResponseUtil.success(
+    res,
+    { business },
+    "WhatsApp connection verified and updated",
+  );
+});
+
 export const updateWorkingHoursDay = asyncHandler(async (req, res) => {
   const { day } = req.params;
   const { isOpen, openTime, closeTime } = req.body;

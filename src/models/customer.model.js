@@ -335,7 +335,7 @@ const customerSchema = new mongoose.Schema(
     },
     whatsappOptIn: {
       type: Boolean,
-      default: true,
+      default: false,
       index: true,
     },
     consentDate: Date,

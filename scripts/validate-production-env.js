@@ -5,7 +5,9 @@ const required = [
   "JWT_ACCESS_SECRET",
   "JWT_REFRESH_SECRET",
   "WEBHOOK_VERIFY_TOKEN",
+  "META_APP_SECRET",
   "WHATSAPP_ENCRYPTION_KEY",
+  "REDIS_URL",
   "CLIENT_URL",
   "GMAIL_USER",
   "GMAIL_APP_PASSWORD",
@@ -23,9 +25,12 @@ const weakSecret = (value) => !value || String(value).length < 32;
 
 const missingRequired = required.filter((key) => !process.env[key]);
 const missingRecommended = recommended.filter((key) => !process.env[key]);
-const weakSecrets = ["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "WHATSAPP_ENCRYPTION_KEY"].filter(
-  (key) => weakSecret(process.env[key]),
-);
+const weakSecrets = [
+  "JWT_ACCESS_SECRET",
+  "JWT_REFRESH_SECRET",
+  "WHATSAPP_ENCRYPTION_KEY",
+  "META_APP_SECRET",
+].filter((key) => weakSecret(process.env[key]));
 
 if (missingRequired.length > 0) {
   console.error("[env] Missing required production variables:");

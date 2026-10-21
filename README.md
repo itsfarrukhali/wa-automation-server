@@ -105,14 +105,14 @@ npm run dev
 Health checks:
 
 ```text
-GET http://localhost:3000/api/health
-GET http://localhost:3000/api/ready
+GET http://localhost:5000/api/health
+GET http://localhost:5000/api/ready
 ```
 
-If your local port is `5000`, use:
+The frontend development server starts at:
 
 ```text
-http://localhost:5000
+http://localhost:3001
 ```
 
 ## Required environment variables
@@ -139,7 +139,9 @@ WhatsApp:
 WA_TOKEN=
 WA_PHONE_ID=
 WHATSAPP_GRAPH_VERSION=v20.0
+META_APP_SECRET=
 WEBHOOK_VERIFY_TOKEN=
+WEBHOOK_SIGNATURE_REQUIRED=true
 WHATSAPP_ENCRYPTION_KEY=
 ```
 
@@ -156,6 +158,9 @@ RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=300
 AUTH_RATE_LIMIT_MAX=20
 WHATSAPP_RATE_LIMIT_MAX=60
+REDIS_URL=rediss://default:<password>@<host>:6379
+REDIS_KEY_PREFIX=zario
+RATE_LIMIT_FAIL_OPEN=true
 ```
 
 Superadmin:
@@ -304,7 +309,8 @@ Available now:
 - audit logs: `GET /api/v1/admin/audit-logs`
 - log files: `GET /api/v1/admin/logs`
 - log tail: `GET /api/v1/admin/logs/tail?file=app.log&lines=200`
-- rate limiting
+- Redis-backed distributed rate limiting (memory fallback for local development)
+- signed WhatsApp webhook verification
 - request IDs
 - structured logs in `logs/app.log` and `logs/error.log`
 - MongoDB backup/restore scripts
@@ -333,7 +339,6 @@ Blocked by external approvals/credentials:
 
 Can be added after deployment:
 
-- Redis-backed distributed rate limits
 - external log shipping
 - uptime monitoring
 - cloud backup automation

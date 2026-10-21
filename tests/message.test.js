@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
+import request from "supertest";
 
+import app from "../app.js";
 import Business from "../src/models/business/business.model.js";
 import AutomationRule from "../src/models/automationRule.model.js";
 import Category from "../src/models/common/categorySchema.js";
@@ -10,6 +13,7 @@ import MessageLog from "../src/models/messagelog.model.js";
 import User from "../src/models/user.model.js";
 import * as MessageService from "../src/services/message.service.js";
 import * as WebhookService from "../src/services/webhook.service.js";
+import { env } from "../src/lib/env.js";
 import {
   resetWhatsAppFetchImplementation,
   setWhatsAppFetchImplementation,
@@ -269,7 +273,7 @@ describe("MessageService.sendTextMessage", () => {
     assert.equal(message.status, "sent");
   });
 
-  it("falls back to env WA_TOKEN when stored business token cannot decrypt", async () => {
+  it("fails closed when the stored business token cannot decrypt", async () => {
     const { user, business, customer } = await seedBusinessContext();
     business.whatsapp.accessToken = JSON.stringify({
       encrypted: "bad",
@@ -279,23 +283,66 @@ describe("MessageService.sendTextMessage", () => {
     business.markModified("whatsapp");
     await business.save();
 
-    let authHeader;
+    let providerCalled = false;
+    setWhatsAppFetchImplementation(async () => {
+      providerCalled = true;
+      throw new Error("Provider must not be called");
+    });
+
+    await assert.rejects(
+      () =>
+        MessageService.sendTextMessage(user._id.toString(), {
+          customerId: customer._id.toString(),
+          text: "Do not use another tenant's fallback token",
+        }),
+      /stored WhatsApp token is invalid/i,
+    );
+
+    assert.equal(providerCalled, false);
+    const failed = await MessageLog.findOne({ status: "failed" });
+    assert.match(failed.failureReason, /stored WhatsApp token is invalid/i);
+  });
+});
+
+describe("MessageService.sendTemplateMessage", () => {
+  it("sends the selected template and increments only its usage", async () => {
+    const { user, business, customer } = await seedBusinessContext();
+    business.whatsapp.templates = [
+      {
+        name: "hello_world",
+        language: "en_US",
+        category: "UTILITY",
+        status: "APPROVED",
+      },
+    ];
+    await business.save();
+
+    let payload;
     setWhatsAppFetchImplementation(async (_url, options) => {
-      authHeader = options.headers.Authorization;
+      payload = JSON.parse(options.body);
       return {
         ok: true,
         status: 200,
-        json: async () => ({ messages: [{ id: "wamid.sent-env-fallback" }] }),
+        json: async () => ({ messages: [{ id: "wamid.template-1" }] }),
       };
     });
 
-    const message = await MessageService.sendTextMessage(user._id.toString(), {
-      customerId: customer._id.toString(),
-      text: "Use env token fallback",
-    });
+    const message = await MessageService.sendTemplateMessage(
+      user._id.toString(),
+      {
+        customerId: customer._id.toString(),
+        templateName: "hello_world",
+        language: "en_US",
+      },
+    );
 
     assert.equal(message.status, "sent");
-    assert.equal(authHeader, `Bearer ${process.env.WA_TOKEN}`);
+    assert.equal(payload.type, "template");
+    assert.equal(payload.template.name, "hello_world");
+
+    const updatedBusiness = await Business.findById(business._id);
+    assert.equal(updatedBusiness.whatsapp.templates[0].usageCount, 1);
+    assert.ok(updatedBusiness.whatsapp.templates[0].lastUsed);
   });
 });
 
@@ -308,6 +355,56 @@ describe("WebhookService", () => {
     });
 
     assert.equal(challenge, "challenge-123");
+  });
+
+  it("verifies Meta webhook payload signatures when enforcement is enabled", () => {
+    const previousRequired = env.WEBHOOK_SIGNATURE_REQUIRED;
+    const previousSecret = env.META_APP_SECRET;
+    const rawBody = Buffer.from('{"object":"whatsapp_business_account"}');
+
+    env.WEBHOOK_SIGNATURE_REQUIRED = "true";
+    env.META_APP_SECRET = "test-meta-app-secret-test-meta-app-secret";
+    const signature = `sha256=${crypto
+      .createHmac("sha256", env.META_APP_SECRET)
+      .update(rawBody)
+      .digest("hex")}`;
+
+    try {
+      assert.equal(
+        WebhookService.verifyWhatsAppWebhookSignature({ signature, rawBody }),
+        true,
+      );
+      assert.throws(
+        () =>
+          WebhookService.verifyWhatsAppWebhookSignature({
+            signature: "sha256=invalid",
+            rawBody,
+          }),
+        /Invalid WhatsApp webhook signature/,
+      );
+    } finally {
+      env.WEBHOOK_SIGNATURE_REQUIRED = previousRequired;
+      env.META_APP_SECRET = previousSecret;
+    }
+  });
+
+  it("rejects unsigned webhook HTTP requests when signature enforcement is enabled", async () => {
+    const previousRequired = env.WEBHOOK_SIGNATURE_REQUIRED;
+    const previousSecret = env.META_APP_SECRET;
+    env.WEBHOOK_SIGNATURE_REQUIRED = "true";
+    env.META_APP_SECRET = "test-meta-app-secret-test-meta-app-secret";
+
+    try {
+      const response = await request(app)
+        .post("/api/v1/webhooks/whatsapp")
+        .send({ object: "whatsapp_business_account", entry: [] });
+
+      assert.equal(response.status, 401);
+      assert.match(response.body.message, /Missing WhatsApp webhook signature/);
+    } finally {
+      env.WEBHOOK_SIGNATURE_REQUIRED = previousRequired;
+      env.META_APP_SECRET = previousSecret;
+    }
   });
 
   it("creates customer and inbound message records from WhatsApp webhooks", async () => {
@@ -334,6 +431,21 @@ describe("WebhookService", () => {
     const updatedBusiness = await Business.findById(business._id);
     assert.equal(updatedBusiness.whatsapp.webhookEvents.length, 1);
     assert.equal(updatedBusiness.whatsapp.webhookEvents[0].event, "inbound_message");
+  });
+
+  it("does not process the same inbound WhatsApp message twice", async () => {
+    await seedBusinessContext();
+    const payload = sampleWebhookPayload();
+
+    const first = await WebhookService.processWhatsAppWebhook(payload);
+    const duplicate = await WebhookService.processWhatsAppWebhook(payload);
+
+    assert.equal(first.results[0].action, "created_inbound");
+    assert.equal(duplicate.results[0].action, "duplicate_inbound");
+    assert.equal(
+      await MessageLog.countDocuments({ waMessageId: "wamid.inbound-1" }),
+      1,
+    );
   });
 
   it("groups recent messages into an inbox conversation list", async () => {
@@ -524,5 +636,56 @@ describe("WebhookService", () => {
     assert.equal(updatedBusiness.whatsapp.messages.delivered, 1);
     assert.equal(updatedBusiness.whatsapp.webhookEvents.length, 1);
     assert.equal(updatedBusiness.whatsapp.webhookEvents[0].event, "status_update");
+  });
+
+  it("ignores duplicate and stale delivery status webhooks", async () => {
+    const { business, customer } = await seedBusinessContext();
+    await MessageLog.create({
+      businessId: business._id,
+      customerId: customer._id,
+      type: "manual",
+      direction: "out",
+      contentType: "text",
+      content: "Hello",
+      status: "read",
+      waMessageId: "wamid.status-idempotent",
+    });
+
+    const statusPayload = (status) => ({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          changes: [
+            {
+              field: "messages",
+              value: {
+                metadata: { phone_number_id: "phone-number-123" },
+                statuses: [
+                  {
+                    id: "wamid.status-idempotent",
+                    status,
+                    timestamp: "1719000010",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const duplicate = await WebhookService.processWhatsAppWebhook(
+      statusPayload("read"),
+    );
+    const stale = await WebhookService.processWhatsAppWebhook(
+      statusPayload("delivered"),
+    );
+
+    assert.equal(duplicate.results[0].action, "duplicate_status");
+    assert.equal(stale.results[0].action, "stale_status_ignored");
+    const message = await MessageLog.findOne({
+      waMessageId: "wamid.status-idempotent",
+    });
+    assert.equal(message.status, "read");
   });
 });

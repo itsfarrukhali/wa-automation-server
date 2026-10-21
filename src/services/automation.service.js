@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 import AutomationRule from "../models/automationRule.model.js";
 import Business from "../models/business/business.model.js";
 import MessageLog from "../models/messagelog.model.js";
-import { env } from "../lib/env.js";
 import { getMyBusiness } from "./business.service.js";
+import { resolveWhatsAppMessagingCredentials } from "./whatsappCredentials.service.js";
 import { AppError } from "../utils/helpers/errorHandler.utils.js";
 import {
   buildTextPayload,
@@ -65,25 +65,6 @@ const assertCanSendMessage = (business) => {
       403,
     );
   }
-};
-
-const resolveWhatsAppCredentials = (business) => {
-  const phoneNumberId = business.whatsapp?.phoneNumberId || env.WA_PHONE_ID;
-  let businessAccessToken = null;
-
-  try {
-    businessAccessToken = business.whatsapp?.decryptToken?.();
-  } catch {
-    businessAccessToken = null;
-  }
-
-  const accessToken = businessAccessToken || env.WA_TOKEN;
-
-  if (!phoneNumberId || !accessToken) {
-    throw new AppError("WhatsApp is not fully connected.", 422);
-  }
-
-  return { phoneNumberId, accessToken };
 };
 
 export const createAutomationRule = async (userId, data) => {
@@ -246,7 +227,7 @@ export const processInboundAutomations = async ({
       });
 
       const response = await sendWhatsAppMessage({
-        ...resolveWhatsAppCredentials(business),
+        ...resolveWhatsAppMessagingCredentials(business),
         payload: buildTextPayload({
           to: customer.whatsappNumber || customer.phone,
           text: rule.response.text,

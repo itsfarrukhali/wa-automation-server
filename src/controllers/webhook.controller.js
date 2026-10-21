@@ -8,6 +8,10 @@ export const verifyWhatsAppWebhook = asyncHandler(async (req, res) => {
 });
 
 export const receiveWhatsAppWebhook = asyncHandler(async (req, res) => {
+  WebhookService.verifyWhatsAppWebhookSignature({
+    signature: req.get("x-hub-signature-256"),
+    rawBody: req.rawBody,
+  });
   const result = await WebhookService.processWhatsAppWebhook(req.body);
   return ApiResponseUtil.success(res, result, "Webhook processed");
 });

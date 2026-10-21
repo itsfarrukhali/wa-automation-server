@@ -187,7 +187,8 @@ whatsappSchema.methods.decryptToken = function () {
 
 whatsappSchema.methods.isConnected = function () {
   return (
-    this.connectionStatus === "connected" && this.tokenExpiresAt > new Date()
+    this.connectionStatus === "connected" &&
+    (!this.tokenExpiresAt || this.tokenExpiresAt > new Date())
   );
 };
 

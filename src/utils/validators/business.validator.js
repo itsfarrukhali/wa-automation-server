@@ -172,6 +172,15 @@ export const step5Validator = [
   body("accessToken").optional().trim(),
 ];
 
+export const whatsappReconnectValidator = [
+  body("phoneNumberId").trim().notEmpty().withMessage("Phone Number ID is required"),
+  body("wabaId").trim().notEmpty().withMessage("WABA ID is required"),
+  body("accessToken")
+    .trim()
+    .isLength({ min: 50 })
+    .withMessage("A valid Meta access token is required"),
+];
+
 // ─── Profile Update ───────────────────────────────────────────────────────────
 
 export const profileUpdateValidator = [

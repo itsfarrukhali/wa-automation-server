@@ -32,7 +32,8 @@ platform.
 - Billing MVP
 - Reports
 - Audit logs
-- Rate limiting
+- Redis-backed distributed rate limiting
+- Signed WhatsApp webhook verification
 - Structured logs
 - Backup/restore scripts
 - Dockerfile
@@ -53,7 +54,6 @@ Blocked by external paperwork/credentials:
 Can be done after deployment:
 
 - external monitoring dashboard
-- Redis-backed distributed rate limiting
 - cloud backup automation
 - frontend dashboard in Next.js
 
@@ -82,6 +82,9 @@ RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=300
 AUTH_RATE_LIMIT_MAX=20
 WHATSAPP_RATE_LIMIT_MAX=60
+REDIS_URL=rediss://default:<password>@<host>:6379
+REDIS_KEY_PREFIX=zario
+RATE_LIMIT_FAIL_OPEN=true
 ```
 
 WhatsApp:
@@ -90,7 +93,9 @@ WhatsApp:
 WA_TOKEN=
 WA_PHONE_ID=
 WHATSAPP_GRAPH_VERSION=v20.0
+META_APP_SECRET=
 WEBHOOK_VERIFY_TOKEN=
+WEBHOOK_SIGNATURE_REQUIRED=true
 WHATSAPP_ENCRYPTION_KEY=
 ```
 
@@ -145,6 +150,7 @@ same value as WEBHOOK_VERIFY_TOKEN
 ```
 
 - Subscribe to `messages`
+- Copy the Meta app secret to `META_APP_SECRET`; never expose it in the frontend
 - Register real WhatsApp business phone number
 - Generate permanent/system-user access token
 - Add payment method in Meta

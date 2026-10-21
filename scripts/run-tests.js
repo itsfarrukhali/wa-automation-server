@@ -10,6 +10,10 @@ const testFiles = readdirSync(resolve("tests"))
 const testEnv = {
   ...process.env,
   NODE_ENV: "test",
+  // Test suites intentionally make many requests from one in-memory client.
+  // Keep rate-limit behaviour covered by dedicated middleware tests instead of
+  // allowing request order to make otherwise unrelated suites flaky.
+  RATE_LIMIT_ENABLED: "false",
   MONGODB_URI:
     process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/zario-test",
   JWT_ACCESS_SECRET:

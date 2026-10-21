@@ -11,6 +11,7 @@ import {
   onboardStep5,
   updateProfile,
   updateSettings,
+  reconnectWhatsApp,
   updateWorkingHoursDay,
   updateEngagement,
   getPlan,
@@ -26,6 +27,7 @@ import {
   step5Validator,
   profileUpdateValidator,
   settingsValidator,
+  whatsappReconnectValidator,
   workingHoursDayValidator,
   engagementValidator,
   planUpgradeValidator,
@@ -66,6 +68,12 @@ router.patch("/onboarding/step-5", step5Validator, validate, onboardStep5);
 
 router.patch("/profile", profileUpdateValidator, validate, updateProfile);
 router.patch("/settings", settingsValidator, validate, updateSettings);
+router.patch(
+  "/whatsapp/reconnect",
+  whatsappReconnectValidator,
+  validate,
+  reconnectWhatsApp,
+);
 
 router.patch(
   "/working-hours/:day",

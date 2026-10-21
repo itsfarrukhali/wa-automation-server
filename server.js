@@ -6,6 +6,7 @@ import {
   startSchedulerWorker,
   stopSchedulerWorker,
 } from "./src/workers/scheduler.worker.js";
+import { closeRedis } from "./src/lib/redis.js";
 
 const PORT = env.PORT;
 
@@ -23,7 +24,8 @@ const startServer = async () => {
     const shutdown = (signal) => {
       console.log(`Received ${signal}. Shutting down...`);
       stopSchedulerWorker();
-      server.close(() => {
+      server.close(async () => {
+        await closeRedis();
         process.exit(0);
       });
     };

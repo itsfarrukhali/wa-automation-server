@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 import Business from "../models/business/business.model.js";
 import Customer from "../models/customer.model.js";
 import MessageLog from "../models/messagelog.model.js";
-import { env } from "../lib/env.js";
 import { getMyBusiness } from "./business.service.js";
+import { resolveWhatsAppMessagingCredentials } from "./whatsappCredentials.service.js";
 import { incrementTemplateUsageByName } from "./template.service.js";
 import { AppError } from "../utils/helpers/errorHandler.utils.js";
 import {
@@ -49,33 +49,6 @@ const getCustomerForBusiness = async (businessId, customerId) => {
   }
 
   return customer;
-};
-
-const resolveWhatsAppCredentials = (business) => {
-  const phoneNumberId = business.whatsapp?.phoneNumberId || env.WA_PHONE_ID;
-  let businessAccessToken = null;
-
-  try {
-    businessAccessToken = business.whatsapp?.decryptToken?.();
-  } catch (error) {
-    if (!env.WA_TOKEN) {
-      throw new AppError(
-        "Stored WhatsApp token could not be decrypted. Reconnect WhatsApp with the current WHATSAPP_ENCRYPTION_KEY.",
-        422,
-      );
-    }
-  }
-
-  const accessToken = businessAccessToken || env.WA_TOKEN;
-
-  if (!phoneNumberId || !accessToken) {
-    throw new AppError(
-      "WhatsApp is not fully connected. Add phoneNumberId and access token first.",
-      422,
-    );
-  }
-
-  return { phoneNumberId, accessToken };
 };
 
 const assertCanSendMessage = (business) => {
@@ -174,7 +147,7 @@ export const sendTextMessage = async (userId, data) => {
 
   try {
     const response = await sendWhatsAppMessage({
-      ...resolveWhatsAppCredentials(business),
+      ...resolveWhatsAppMessagingCredentials(business),
       payload: buildTextPayload({
         to: recipient,
         text,
@@ -182,11 +155,6 @@ export const sendTextMessage = async (userId, data) => {
       }),
     });
     await markOutboundSent(message, response);
-    await incrementTemplateUsageByName({
-      businessId: business._id,
-      name: data.templateName,
-      language: data.language || "en_US",
-    });
     return message;
   } catch (error) {
     await markOutboundFailed(message, error);
@@ -217,7 +185,7 @@ export const sendTemplateMessage = async (userId, data) => {
 
   try {
     const response = await sendWhatsAppMessage({
-      ...resolveWhatsAppCredentials(business),
+      ...resolveWhatsAppMessagingCredentials(business),
       payload: buildTemplatePayload({
         to: recipient,
         templateName: data.templateName,
@@ -226,6 +194,11 @@ export const sendTemplateMessage = async (userId, data) => {
       }),
     });
     await markOutboundSent(message, response);
+    await incrementTemplateUsageByName({
+      businessId: business._id,
+      name: data.templateName,
+      language: data.language || "en_US",
+    });
     return message;
   } catch (error) {
     await markOutboundFailed(message, error);
