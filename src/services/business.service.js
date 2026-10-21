@@ -314,9 +314,10 @@ export const completeStep5WhatsApp = async (userId, data) => {
 export const reconnectWhatsApp = async (userId, data) => {
   const business = await getOwnedBusiness(userId);
   const { phoneNumberId, wabaId, accessToken } = data;
+  const graphBase = `https://graph.facebook.com/${env.WHATSAPP_GRAPH_VERSION}`;
 
   const response = await fetch(
-    `https://graph.facebook.com/${env.WHATSAPP_GRAPH_VERSION}/${encodeURIComponent(phoneNumberId)}?fields=id,display_phone_number,verified_name,quality_rating`,
+    `${graphBase}/${encodeURIComponent(phoneNumberId)}?fields=id,display_phone_number,verified_name,quality_rating`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   const result = await response.json();
@@ -325,6 +326,40 @@ export const reconnectWhatsApp = async (userId, data) => {
     throw new AppError(
       result?.error?.message ||
         "Meta could not verify this token and Phone Number ID.",
+      422,
+    );
+  }
+
+  const wabaPhonesResponse = await fetch(
+    `${graphBase}/${encodeURIComponent(wabaId)}/phone_numbers?fields=id&limit=100`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  const wabaPhones = await wabaPhonesResponse.json();
+  const phoneBelongsToWaba = wabaPhones?.data?.some(
+    (phone) => String(phone.id) === String(phoneNumberId),
+  );
+
+  if (!wabaPhonesResponse.ok || !phoneBelongsToWaba) {
+    throw new AppError(
+      wabaPhones?.error?.message ||
+        "This Phone Number ID does not belong to the supplied WABA, or the token cannot access it.",
+      422,
+    );
+  }
+
+  const subscriptionResponse = await fetch(
+    `${graphBase}/${encodeURIComponent(wabaId)}/subscribed_apps`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+  const subscription = await subscriptionResponse.json();
+
+  if (!subscriptionResponse.ok || subscription.success !== true) {
+    throw new AppError(
+      subscription?.error?.message ||
+        "Meta could not subscribe this WhatsApp Business Account to Zario webhooks.",
       422,
     );
   }

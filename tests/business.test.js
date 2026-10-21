@@ -107,6 +107,83 @@ after(async () => {
   }
 });
 
+describe("WhatsApp reconnect", () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("verifies WABA ownership and subscribes webhooks before saving", async () => {
+    const { user } = await seedUserAndBusiness();
+    const requests = [];
+    const responses = [
+      {
+        ok: true,
+        body: {
+          id: "phone-1",
+          display_phone_number: "+92 320 3939206",
+          verified_name: "Zario",
+          quality_rating: "GREEN",
+        },
+      },
+      { ok: true, body: { data: [{ id: "phone-1" }] } },
+      { ok: true, body: { success: true } },
+    ];
+
+    globalThis.fetch = async (url, options = {}) => {
+      requests.push({ url, options });
+      const response = responses.shift();
+      return { ok: response.ok, json: async () => response.body };
+    };
+
+    await BusinessService.reconnectWhatsApp(user._id, {
+      phoneNumberId: "phone-1",
+      wabaId: "waba-1",
+      accessToken: "permanent-token",
+    });
+
+    const saved = await Business.findOne({ ownerId: user._id }).select(
+      "+whatsapp.accessToken +whatsapp.wabaId",
+    );
+    assert.equal(saved.whatsapp.phoneNumberId, "phone-1");
+    assert.equal(saved.whatsapp.wabaId, "waba-1");
+    assert.equal(saved.whatsapp.connectionStatus, "connected");
+    assert.equal(requests.length, 3);
+    assert.match(requests[1].url, /waba-1\/phone_numbers/);
+    assert.match(requests[2].url, /waba-1\/subscribed_apps/);
+    assert.equal(requests[2].options.method, "POST");
+  });
+
+  it("rejects a Phone Number ID that is not in the supplied WABA", async () => {
+    const { user } = await seedUserAndBusiness();
+    const responses = [
+      { ok: true, body: { id: "phone-1" } },
+      { ok: true, body: { data: [{ id: "different-phone" }] } },
+    ];
+
+    globalThis.fetch = async () => {
+      const response = responses.shift();
+      return { ok: response.ok, json: async () => response.body };
+    };
+
+    await assert.rejects(
+      BusinessService.reconnectWhatsApp(user._id, {
+        phoneNumberId: "phone-1",
+        wabaId: "wrong-waba",
+        accessToken: "permanent-token",
+      }),
+      (error) => error instanceof AppError && error.statusCode === 422,
+    );
+
+    const saved = await Business.findOne({ ownerId: user._id }).select(
+      "+whatsapp.accessToken +whatsapp.wabaId",
+    );
+    assert.equal(saved.whatsapp.accessToken, undefined);
+    assert.notEqual(saved.whatsapp.connectionStatus, "connected");
+  });
+});
+
 beforeEach(async () => {
   // Drop data between tests but keep the seeded Category + City docs
   await User.deleteMany({});
