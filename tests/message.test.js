@@ -113,6 +113,19 @@ const sampleWebhookPayload = (phoneNumberId = "phone-number-123") => ({
   ],
 });
 
+const openCustomerServiceWindow = ({ business, customer, sentAt = new Date() }) =>
+  MessageLog.create({
+    businessId: business._id,
+    customerId: customer._id,
+    type: "inbound",
+    direction: "in",
+    contentType: "text",
+    content: "Customer opened the service window",
+    status: "delivered",
+    waMessageId: `wamid.window-${new mongoose.Types.ObjectId()}`,
+    sentAt,
+  });
+
 before(async () => {
   if (mongoose.connection.readyState !== 1) {
     mongod = await MongoMemoryServer.create();
@@ -154,6 +167,7 @@ beforeEach(async () => {
 describe("MessageService.sendTextMessage", () => {
   it("sends a WhatsApp text message and stores the provider message ID", async () => {
     const { user, business, customer } = await seedBusinessContext();
+    await openCustomerServiceWindow({ business, customer });
     let captured;
 
     setWhatsAppFetchImplementation(async (url, options) => {
@@ -200,7 +214,8 @@ describe("MessageService.sendTextMessage", () => {
   });
 
   it("stores failed outbound messages when Meta rejects the request", async () => {
-    const { user, customer } = await seedBusinessContext();
+    const { user, business, customer } = await seedBusinessContext();
+    await openCustomerServiceWindow({ business, customer });
 
     setWhatsAppFetchImplementation(async () => ({
       ok: false,
@@ -255,6 +270,7 @@ describe("MessageService.sendTextMessage", () => {
 
   it("uses the free plan default limit when legacy businesses have no limits", async () => {
     const { user, business, customer } = await seedBusinessContext();
+    await openCustomerServiceWindow({ business, customer });
     business.plan.limits = undefined;
     business.markModified("plan");
     await business.save();
@@ -275,6 +291,7 @@ describe("MessageService.sendTextMessage", () => {
 
   it("fails closed when the stored business token cannot decrypt", async () => {
     const { user, business, customer } = await seedBusinessContext();
+    await openCustomerServiceWindow({ business, customer });
     business.whatsapp.accessToken = JSON.stringify({
       encrypted: "bad",
       iv: "00112233445566778899aabbccddeeff",
@@ -301,6 +318,33 @@ describe("MessageService.sendTextMessage", () => {
     assert.equal(providerCalled, false);
     const failed = await MessageLog.findOne({ status: "failed" });
     assert.match(failed.failureReason, /stored WhatsApp token is invalid/i);
+  });
+
+  it("blocks free-form text outside the 24-hour customer service window", async () => {
+    const { user, business, customer } = await seedBusinessContext();
+    await openCustomerServiceWindow({
+      business,
+      customer,
+      sentAt: new Date(Date.now() - 25 * 60 * 60 * 1000),
+    });
+
+    let providerCalled = false;
+    setWhatsAppFetchImplementation(async () => {
+      providerCalled = true;
+      throw new Error("Provider must not be called");
+    });
+
+    await assert.rejects(
+      () =>
+        MessageService.sendTextMessage(user._id.toString(), {
+          customerId: customer._id.toString(),
+          text: "This must use a template",
+        }),
+      /24-hour customer service window is closed/i,
+    );
+
+    assert.equal(providerCalled, false);
+    assert.equal(await MessageLog.countDocuments({ direction: "out" }), 0);
   });
 });
 

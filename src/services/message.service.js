@@ -14,6 +14,7 @@ import {
 } from "../utils/whatsapp/sendMessage.utils.js";
 
 const MAX_TEXT_LENGTH = 4096;
+const CUSTOMER_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_PLAN_LIMITS = {
   free: 500,
   starter: 2000,
@@ -61,6 +62,23 @@ const assertCanSendMessage = (business) => {
     throw new AppError(
       `Monthly WhatsApp message limit reached for the ${business.plan?.currentPlan || "free"} plan.`,
       403,
+    );
+  }
+};
+
+const assertCustomerServiceWindowOpen = async (businessId, customerId) => {
+  const windowOpenedAt = new Date(Date.now() - CUSTOMER_SERVICE_WINDOW_MS);
+  const recentInbound = await MessageLog.exists({
+    businessId,
+    customerId,
+    direction: "in",
+    sentAt: { $gte: windowOpenedAt },
+  });
+
+  if (!recentInbound) {
+    throw new AppError(
+      "The 24-hour customer service window is closed. Send an approved WhatsApp template instead.",
+      422,
     );
   }
 };
@@ -135,6 +153,8 @@ export const sendTextMessage = async (userId, data) => {
   if (text.length > MAX_TEXT_LENGTH) {
     throw new AppError(`text cannot exceed ${MAX_TEXT_LENGTH} characters.`, 422);
   }
+
+  await assertCustomerServiceWindowOpen(business._id, customer._id);
 
   const message = await createPendingOutboundLog({
     business,
