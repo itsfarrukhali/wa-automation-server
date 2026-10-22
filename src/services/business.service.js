@@ -19,6 +19,7 @@ import Business from "../models/business/business.model.js";
 import User from "../models/user.model.js";
 import { env } from "../lib/env.js";
 import { AppError } from "../utils/helpers/errorHandler.utils.js";
+import { redactSecretsFromText } from "../utils/security/redactSecrets.utils.js";
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -323,9 +324,12 @@ export const reconnectWhatsApp = async (userId, data) => {
   const result = await response.json();
 
   if (!response.ok || String(result.id) !== String(phoneNumberId)) {
+    const providerMessage = redactSecretsFromText(result?.error?.message);
     throw new AppError(
-      result?.error?.message ||
-        "Meta could not verify this token and Phone Number ID.",
+      Number(result?.error?.code) === 190
+        ? "Meta rejected this access token. Revoke it, generate a new System User token, and paste the complete token."
+        : providerMessage ||
+            "Meta could not verify this token and Phone Number ID.",
       422,
     );
   }
@@ -341,7 +345,7 @@ export const reconnectWhatsApp = async (userId, data) => {
 
   if (!wabaPhonesResponse.ok || !phoneBelongsToWaba) {
     throw new AppError(
-      wabaPhones?.error?.message ||
+      redactSecretsFromText(wabaPhones?.error?.message) ||
         "This Phone Number ID does not belong to the supplied WABA, or the token cannot access it.",
       422,
     );
@@ -358,7 +362,7 @@ export const reconnectWhatsApp = async (userId, data) => {
 
   if (!subscriptionResponse.ok || subscription.success !== true) {
     throw new AppError(
-      subscription?.error?.message ||
+      redactSecretsFromText(subscription?.error?.message) ||
         "Meta could not subscribe this WhatsApp Business Account to Zario webhooks.",
       422,
     );

@@ -1,5 +1,6 @@
 import { env } from "../../lib/env.js";
 import { AppError } from "../helpers/errorHandler.utils.js";
+import { redactSecretsFromText } from "../security/redactSecrets.utils.js";
 
 let fetchImplementation = (...args) => globalThis.fetch(...args);
 
@@ -94,7 +95,7 @@ export const sendWhatsAppMessage = async ({
 
   if (!response.ok) {
     const message =
-      data?.error?.message ||
+      redactSecretsFromText(data?.error?.message) ||
       `WhatsApp API request failed with status ${response.status}`;
     const error = new AppError(message, 502);
     error.meta = {
@@ -133,7 +134,7 @@ export const fetchWhatsAppTemplates = async ({ wabaId, accessToken }) => {
 
   if (!response.ok) {
     const message =
-      data?.error?.message ||
+      redactSecretsFromText(data?.error?.message) ||
       `WhatsApp templates request failed with status ${response.status}`;
     const error = new AppError(message, 502);
     error.meta = {

@@ -12,6 +12,7 @@ import { auditRequests } from "./src/middlewares/audit.middleware.js";
 import { rateLimit } from "./src/middlewares/rateLimit.middleware.js";
 import { requestLogger } from "./src/middlewares/requestLogger.middleware.js";
 import logger from "./src/lib/logger.js";
+import { redactSecretsFromText } from "./src/utils/security/redactSecrets.utils.js";
 import { isRedisConfigured, pingRedis } from "./src/lib/redis.js";
 import userRouter from "./src/routes/api/v1/auth.routes.js";
 import businessRouter from "./src/routes/api/v1/business.routes.js";
@@ -199,7 +200,9 @@ app.use("/api/v1/superadmin", superAdminRouter);
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   let statusCode = err?.isOperational ? err.statusCode || 500 : 500;
-  let message = err.message || "Internal server error";
+  let message = redactSecretsFromText(
+    err.message || "Internal server error",
+  );
 
   // Treat Mongoose validation failures as user-caused 4xx errors.
   if (err?.name === "ValidationError") {
@@ -210,7 +213,7 @@ app.use((err, _req, res, _next) => {
       .filter(Boolean);
 
     if (validationMessages.length > 0) {
-      message = validationMessages.join(", ");
+      message = redactSecretsFromText(validationMessages.join(", "));
     }
   }
 

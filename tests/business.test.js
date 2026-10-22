@@ -182,6 +182,33 @@ describe("WhatsApp reconnect", () => {
     assert.equal(saved.whatsapp.accessToken, undefined);
     assert.notEqual(saved.whatsapp.connectionStatus, "connected");
   });
+
+  it("returns a safe action message when Meta rejects the access token", async () => {
+    const { user } = await seedUserAndBusiness();
+    const leakedToken = `EAA${"x".repeat(120)}`;
+    globalThis.fetch = async () => ({
+      ok: false,
+      json: async () => ({
+        error: {
+          code: 190,
+          message: `Malformed access token ${leakedToken}`,
+        },
+      }),
+    });
+
+    await assert.rejects(
+      BusinessService.reconnectWhatsApp(user._id, {
+        phoneNumberId: "phone-1",
+        wabaId: "waba-1",
+        accessToken: leakedToken,
+      }),
+      (error) =>
+        error instanceof AppError &&
+        error.statusCode === 422 &&
+        error.message.includes("generate a new System User token") &&
+        !error.message.includes(leakedToken),
+    );
+  });
 });
 
 beforeEach(async () => {
