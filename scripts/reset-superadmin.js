@@ -48,8 +48,6 @@ const run = async () => {
   // they are intentionally absent from a maintenance environment.
   process.env.JWT_ACCESS_SECRET ||= "maintenance-access-secret";
   process.env.JWT_REFRESH_SECRET ||= "maintenance-refresh-secret";
-  process.env.WA_TOKEN ||= "maintenance-token";
-  process.env.WA_PHONE_ID ||= "maintenance-phone-id";
   process.env.WEBHOOK_VERIFY_TOKEN ||= "maintenance-webhook-token";
   process.env.WHATSAPP_ENCRYPTION_KEY ||=
     "12345678901234567890123456789012";

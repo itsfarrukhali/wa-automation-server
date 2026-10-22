@@ -14,8 +14,6 @@ const required = [
 ];
 
 const recommended = [
-  "WA_TOKEN",
-  "WA_PHONE_ID",
   "WHATSAPP_GRAPH_VERSION",
   "SUPERADMIN_EMAIL",
   "SUPERADMIN_PASSWORD",

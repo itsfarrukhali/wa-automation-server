@@ -90,14 +90,16 @@ RATE_LIMIT_FAIL_OPEN=true
 WhatsApp:
 
 ```env
-WA_TOKEN=
-WA_PHONE_ID=
 WHATSAPP_GRAPH_VERSION=v20.0
 META_APP_SECRET=
 WEBHOOK_VERIFY_TOKEN=
 WEBHOOK_SIGNATURE_REQUIRED=true
 WHATSAPP_ENCRYPTION_KEY=
 ```
+
+Do not configure a global WhatsApp access token or Phone Number ID. Each tenant
+must reconnect its own WABA credentials from Settings; Zario encrypts the token
+before storing it.
 
 Scheduler:
 

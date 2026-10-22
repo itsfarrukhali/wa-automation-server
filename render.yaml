@@ -48,7 +48,3 @@ services:
         sync: false
       - key: GMAIL_APP_PASSWORD
         sync: false
-      - key: WA_TOKEN
-        sync: false
-      - key: WA_PHONE_ID
-        sync: false

@@ -118,8 +118,6 @@ before(async () => {
   process.env.GMAIL_USER = "noreply@example.com";
   process.env.GMAIL_APP_PASSWORD = "fake-app-password";
   process.env.MONGODB_URI = process.env.MONGODB_URI || "mongodb://test";
-  process.env.WA_TOKEN = "test_wa_token";
-  process.env.WA_PHONE_ID = "test_phone_id";
   process.env.WEBHOOK_VERIFY_TOKEN = "test_webhook_verify_token";
   process.env.WHATSAPP_ENCRYPTION_KEY = "test_encryption_key";
 

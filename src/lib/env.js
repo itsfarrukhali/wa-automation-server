@@ -44,8 +44,6 @@ export const env = {
   ),
 
   // WhatsApp Meta Cloud API
-  WA_TOKEN: optional("WA_TOKEN"),
-  WA_PHONE_ID: optional("WA_PHONE_ID"),
   WHATSAPP_GRAPH_VERSION: optional("WHATSAPP_GRAPH_VERSION", "v20.0"),
   META_APP_SECRET: optional("META_APP_SECRET"),
   WEBHOOK_VERIFY_TOKEN: optional("WEBHOOK_VERIFY_TOKEN"),

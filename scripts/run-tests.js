@@ -20,8 +20,6 @@ const testEnv = {
     process.env.JWT_ACCESS_SECRET || "test-access-secret-test-access-secret",
   JWT_REFRESH_SECRET:
     process.env.JWT_REFRESH_SECRET || "test-refresh-secret-test-refresh-secret",
-  WA_TOKEN: process.env.WA_TOKEN || "test-token",
-  WA_PHONE_ID: process.env.WA_PHONE_ID || "test-phone-id",
   WEBHOOK_VERIFY_TOKEN:
     process.env.WEBHOOK_VERIFY_TOKEN || "test-webhook-token",
   WHATSAPP_ENCRYPTION_KEY:

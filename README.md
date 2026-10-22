@@ -136,14 +136,15 @@ GMAIL_APP_PASSWORD=
 WhatsApp:
 
 ```env
-WA_TOKEN=
-WA_PHONE_ID=
 WHATSAPP_GRAPH_VERSION=v20.0
 META_APP_SECRET=
 WEBHOOK_VERIFY_TOKEN=
 WEBHOOK_SIGNATURE_REQUIRED=true
 WHATSAPP_ENCRYPTION_KEY=
 ```
+
+Each business connects its own Phone Number ID, WABA ID, and access token from
+the Zario Settings page. The token is encrypted before it is stored.
 
 Scheduler/rate limiting:
 
