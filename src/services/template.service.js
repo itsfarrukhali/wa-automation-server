@@ -20,6 +20,15 @@ const normalizeTemplateName = (name) =>
 const getBusinessWithSecrets = (userId) =>
   getMyBusiness(userId, "+whatsapp.accessToken +whatsapp.wabaId");
 
+const getBusinessWithWaba = (userId) =>
+  getMyBusiness(userId, "+whatsapp.wabaId");
+
+const serializeTemplateSource = (business) => ({
+  wabaIdSuffix: business.whatsapp?.wabaId?.slice(-4) || null,
+  displayPhoneNumber: business.whatsapp?.displayPhoneNumber || null,
+  verifiedName: business.whatsapp?.verifiedName || null,
+});
+
 const serializeTemplate = (template) => ({
   id: template._id,
   name: template.name,
@@ -42,7 +51,7 @@ export const listTemplates = async (
   userId,
   { status, category, language, search } = {},
 ) => {
-  const business = await getMyBusiness(userId);
+  const business = await getBusinessWithWaba(userId);
   let templates = business.whatsapp?.templates || [];
 
   if (status) templates = templates.filter((item) => item.status === status);
@@ -58,6 +67,7 @@ export const listTemplates = async (
   return {
     templates: templates.map(serializeTemplate),
     total: templates.length,
+    source: serializeTemplateSource(business),
   };
 };
 
@@ -149,32 +159,47 @@ export const syncTemplatesFromMeta = async (userId) => {
   const response = await fetchWhatsAppTemplates(credentials);
   const metaTemplates = response?.data || [];
   const existing = business.whatsapp.templates || [];
+  const existingByKey = new Map(
+    existing.map((item) => [`${item.name}:${item.language}`, item]),
+  );
+  const nextTemplates = [];
+  const syncedKeys = new Set();
   let created = 0;
   let updated = 0;
 
   for (const metaTemplate of metaTemplates) {
     const mapped = mapMetaTemplate(metaTemplate);
-    const current = existing.find(
-      (item) => item.name === mapped.name && item.language === mapped.language,
-    );
+    const key = `${mapped.name}:${mapped.language}`;
+    if (syncedKeys.has(key)) continue;
+    syncedKeys.add(key);
+
+    const current = existingByKey.get(key);
 
     if (current) {
       current.category = mapped.category;
       current.status = mapped.status;
       current.components = mapped.components;
+      nextTemplates.push(current);
       updated += 1;
     } else {
-      business.whatsapp.templates.push(mapped);
+      nextTemplates.push(mapped);
       created += 1;
     }
   }
 
+  const removed = existing.filter(
+    (item) => !syncedKeys.has(`${item.name}:${item.language}`),
+  ).length;
+  business.whatsapp.templates = nextTemplates;
+  business.markModified("whatsapp.templates");
   await business.save();
 
   return {
-    synced: metaTemplates.length,
+    synced: nextTemplates.length,
     created,
     updated,
+    removed,
+    source: serializeTemplateSource(business),
     templates: business.whatsapp.templates.map(serializeTemplate),
   };
 };

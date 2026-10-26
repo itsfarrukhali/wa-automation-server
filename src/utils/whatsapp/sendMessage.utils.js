@@ -120,31 +120,47 @@ export const fetchWhatsAppTemplates = async ({ wabaId, accessToken }) => {
     throw new AppError("WhatsApp access token is required.", 422);
   }
 
-  const response = await fetchImplementation(
-    `https://graph.facebook.com/${env.WHATSAPP_GRAPH_VERSION}/${wabaId}/message_templates`,
-    {
+  const templates = [];
+  let after;
+
+  for (let page = 0; page < 20; page += 1) {
+    const url = new URL(
+      `https://graph.facebook.com/${env.WHATSAPP_GRAPH_VERSION}/${wabaId}/message_templates`,
+    );
+    url.searchParams.set(
+      "fields",
+      "id,name,language,status,category,components",
+    );
+    url.searchParams.set("limit", "250");
+    if (after) url.searchParams.set("after", after);
+
+    const response = await fetchImplementation(url.toString(), {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-    },
-  );
+    });
+    const data = await response.json().catch(() => ({}));
 
-  const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message =
+        redactSecretsFromText(data?.error?.message) ||
+        `WhatsApp templates request failed with status ${response.status}`;
+      const error = new AppError(message, 502);
+      error.meta = {
+        provider: "meta_whatsapp",
+        status: response.status,
+        code: data?.error?.code,
+        type: data?.error?.type,
+      };
+      throw error;
+    }
 
-  if (!response.ok) {
-    const message =
-      redactSecretsFromText(data?.error?.message) ||
-      `WhatsApp templates request failed with status ${response.status}`;
-    const error = new AppError(message, 502);
-    error.meta = {
-      provider: "meta_whatsapp",
-      status: response.status,
-      code: data?.error?.code,
-      type: data?.error?.type,
-    };
-    throw error;
+    templates.push(...(data.data || []));
+    const nextAfter = data.paging?.next && data.paging?.cursors?.after;
+    if (!nextAfter) break;
+    after = nextAfter;
   }
 
-  return data;
+  return { data: templates };
 };

@@ -185,6 +185,40 @@ describe("TemplateService", () => {
     assert.equal(result.templates[0].status, "APPROVED");
   });
 
+  it("removes templates that no longer exist in the connected WABA", async () => {
+    const { user } = await seedContext();
+    await TemplateService.createTemplate(user._id.toString(), {
+      name: "stale_template",
+      language: "en_US",
+      category: "MARKETING",
+      status: "APPROVED",
+    });
+
+    setWhatsAppFetchImplementation(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: [
+          {
+            name: "current_template",
+            language: "en_US",
+            category: "UTILITY",
+            status: "APPROVED",
+          },
+        ],
+      }),
+    }));
+
+    const result = await TemplateService.syncTemplatesFromMeta(
+      user._id.toString(),
+    );
+
+    assert.equal(result.removed, 1);
+    assert.equal(result.templates.length, 1);
+    assert.equal(result.templates[0].name, "current_template");
+    assert.equal(result.source.wabaIdSuffix, "-123");
+  });
+
   it("tracks template usage", async () => {
     const { user } = await seedContext();
     const template = await TemplateService.createTemplate(user._id.toString(), {
