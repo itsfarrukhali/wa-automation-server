@@ -10,7 +10,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node server.js",
+    "start": "node --import ./instrument.js server.js",
     "seed": "node seed/index.js",
     "reset:superadmin": "node scripts/reset-superadmin.js",
     "repair:message-index": "node scripts/repair-message-index.js",
@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
+    "@sentry/node": "^11.14.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.73.4",
     "cookie-parser": "^1.4.7",

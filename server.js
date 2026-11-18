@@ -7,6 +7,7 @@ import {
   stopSchedulerWorker,
 } from "./src/workers/scheduler.worker.js";
 import { closeRedis } from "./src/lib/redis.js";
+import * as Sentry from "@sentry/node";
 
 const PORT = env.PORT;
 
@@ -33,6 +34,8 @@ const startServer = async () => {
     process.once("SIGINT", () => shutdown("SIGINT"));
     process.once("SIGTERM", () => shutdown("SIGTERM"));
   } catch (err) {
+    Sentry.captureException(err);
+    await Sentry.flush(2_000);
     console.error("Failed to start server:", err.message);
     process.exit(1);
   }

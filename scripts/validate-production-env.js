@@ -17,6 +17,7 @@ const recommended = [
   "WHATSAPP_GRAPH_VERSION",
   "SUPERADMIN_EMAIL",
   "SUPERADMIN_PASSWORD",
+  "SENTRY_DSN",
 ];
 
 const weakSecret = (value) => !value || String(value).length < 32;

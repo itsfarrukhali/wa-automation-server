@@ -48,3 +48,9 @@ services:
         sync: false
       - key: GMAIL_APP_PASSWORD
         sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: production
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.05"
