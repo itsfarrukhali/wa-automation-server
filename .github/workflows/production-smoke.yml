@@ -1,0 +1,28 @@
+name: Production smoke tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SMOKE_FRONTEND_URL: https://zario-web.vercel.app
+      SMOKE_BACKEND_URL: https://wa-automation-server-vyzg.onrender.com
+      SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+      SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+    steps:
+      - name: Check out backend
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run production smoke tests
+        run: node scripts/smoke-production.js

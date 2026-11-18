@@ -17,6 +17,7 @@
     "backup:mongo": "node scripts/backup-mongodb.js",
     "restore:mongo": "node scripts/restore-mongodb.js",
     "validate:prod-env": "node scripts/validate-production-env.js",
+    "smoke:prod": "node scripts/smoke-production.js",
     "dev": "nodemon --legacy-watch server.js",
     "test": "node scripts/run-tests.js"
   },
