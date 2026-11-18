@@ -22,8 +22,11 @@ npm run smoke:prod
 
 ## Authenticated checks
 
-Use a dedicated verified owner account with no privileged admin role. Never put
-its password in the repository or a committed `.env` file.
+Use a dedicated verified staff account attached to the production test business.
+Never put its password in the repository or a committed `.env` file. A staff
+account can test templates and inbox with least privilege; the owner-only
+WhatsApp connection check is then reported as skipped. If an owner smoke account
+is deliberately used, that additional read-only health check runs as well.
 
 ```powershell
 $env:SMOKE_EMAIL="smoke@example.com"

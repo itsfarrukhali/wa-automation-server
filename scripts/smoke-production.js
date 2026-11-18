@@ -194,6 +194,7 @@ const authenticatedChecks = async () => {
 
   let accessToken;
   let refreshCookie;
+  let authenticatedRole;
 
   await runCheck("Production login", async () => {
     const result = await request(`${apiUrl}/auth/login`, {
@@ -215,22 +216,32 @@ const authenticatedChecks = async () => {
     const result = await request(`${apiUrl}/auth/me`, { headers: authHeaders });
     expectStatus(result.response.status, 200, "Authenticated /auth/me");
     if (!result.json?.data?.user) throw new Error("Authenticated user payload is missing");
-    return "user session is valid";
+    authenticatedRole = result.json.data.user.role;
+    return `user session is valid (role=${authenticatedRole || "unknown"})`;
   });
 
-  await runCheck("WhatsApp connection", async () => {
-    const result = await request(`${apiUrl}/business/whatsapp/status`, {
-      headers: authHeaders,
+  if (authenticatedRole === "owner") {
+    await runCheck("WhatsApp connection", async () => {
+      const result = await request(`${apiUrl}/business/whatsapp/status`, {
+        headers: authHeaders,
+      });
+      expectStatus(result.response.status, 200, "WhatsApp connection status");
+      const connection = result.json?.data;
+      if (connection?.health !== "healthy" || connection?.tokenValid !== true) {
+        throw new Error(
+          `WhatsApp is not healthy: health=${connection?.health || "unknown"}, tokenValid=${String(connection?.tokenValid)}`,
+        );
+      }
+      return "healthy and token valid";
     });
-    expectStatus(result.response.status, 200, "WhatsApp connection status");
-    const connection = result.json?.data;
-    if (connection?.health !== "healthy" || connection?.tokenValid !== true) {
-      throw new Error(
-        `WhatsApp is not healthy: health=${connection?.health || "unknown"}, tokenValid=${String(connection?.tokenValid)}`,
-      );
-    }
-    return "healthy and token valid";
-  });
+  } else {
+    record(
+      "WhatsApp connection",
+      "SKIP",
+      0,
+      "Owner-only check; use a dedicated staff smoke account for least privilege",
+    );
+  }
 
   await runCheck("WhatsApp templates", async () => {
     const result = await request(`${apiUrl}/whatsapp/templates`, {
