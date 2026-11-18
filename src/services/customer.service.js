@@ -215,6 +215,12 @@ export const updateCustomer = async (userId, customerId, updates) => {
     }
   }
 
+  if (updates.whatsappOptIn === true) {
+    customer.optedOutAt = null;
+    customer.optOutReason = null;
+    customer.waOptOutCategories = [];
+  }
+
   customer.lastUpdatedBy = userId;
 
   try {

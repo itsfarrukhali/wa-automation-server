@@ -28,6 +28,14 @@ const OPT_OUT_KEYWORDS = new Set([
   "ruk jao",
 ]);
 
+const OPT_IN_KEYWORDS = new Set([
+  "start",
+  "subscribe",
+  "opt in",
+  "optin",
+  "resume",
+]);
+
 const normalizeInboundText = (text = "") =>
   String(text).trim().replace(/\s+/g, " ").toLowerCase();
 
@@ -202,6 +210,7 @@ const processInboundMessage = async ({ business, value, message }) => {
   const content = extractTextContent(message);
   const normalizedText = normalizeInboundText(content);
   const isOptOut = OPT_OUT_KEYWORDS.has(normalizedText);
+  const isOptIn = OPT_IN_KEYWORDS.has(normalizedText);
 
   let log;
   try {
@@ -220,10 +229,10 @@ const processInboundMessage = async ({ business, value, message }) => {
       context: message.context
         ? { replyToWaMessageId: message.context.id }
         : undefined,
-      requiredHumanIntervention: !isOptOut,
+      requiredHumanIntervention: !isOptOut && !isOptIn,
       isAutomated: false,
       aiMetadata: {
-        intent: isOptOut ? "opt_out" : undefined,
+        intent: isOptOut ? "opt_out" : isOptIn ? "opt_in" : undefined,
         entities: [],
       },
     });
@@ -272,6 +281,18 @@ const processInboundMessage = async ({ business, value, message }) => {
     });
 
     return { action: "customer_opted_out", messageId: log._id };
+  }
+
+  if (isOptIn) {
+    await customer.optIn();
+
+    await recordWebhookEvent(business._id, "customer_opted_in", {
+      customerId: customer._id,
+      waMessageId: message.id,
+      from: message.from,
+    });
+
+    return { action: "customer_opted_in", messageId: log._id };
   }
 
   const automations = await processInboundAutomations({

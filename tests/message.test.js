@@ -636,6 +636,63 @@ describe("WebhookService", () => {
     assert.equal(customer.optOutReason, "user_request");
   });
 
+  it("opts customers back in when they send START", async () => {
+    const { business, customer } = await seedBusinessContext({
+      whatsappOptIn: false,
+    });
+    customer.optedOutAt = new Date();
+    customer.optOutReason = "user_request";
+    await customer.save();
+
+    const result = await WebhookService.processWhatsAppWebhook({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          changes: [
+            {
+              field: "messages",
+              value: {
+                metadata: {
+                  display_phone_number: "923001112222",
+                  phone_number_id: "phone-number-123",
+                },
+                contacts: [
+                  {
+                    profile: { name: "Opt In Customer" },
+                    wa_id: "923001234567",
+                  },
+                ],
+                messages: [
+                  {
+                    from: "923001234567",
+                    id: "wamid.start-1",
+                    timestamp: "1719000000",
+                    type: "text",
+                    text: { body: "START" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    assert.equal(result.results[0].action, "customer_opted_in");
+
+    const updated = await Customer.findById(customer._id);
+    assert.equal(updated.whatsappOptIn, true);
+    assert.equal(updated.optedOut, false);
+    assert.equal(updated.optedOutAt, null);
+    assert.equal(updated.optOutReason, null);
+
+    const updatedBusiness = await Business.findById(business._id);
+    assert.equal(
+      updatedBusiness.whatsapp.webhookEvents.at(-1).event,
+      "customer_opted_in",
+    );
+  });
+
   it("updates outbound message status from WhatsApp delivery webhooks", async () => {
     const { business, customer } = await seedBusinessContext();
     await MessageLog.create({

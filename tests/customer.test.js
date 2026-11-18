@@ -215,6 +215,20 @@ describe("Customer service", () => {
 
     assert.equal(updated.whatsappOptIn, false);
     assert.equal(updated.optedOut, true);
+
+    updated.optedOutAt = new Date();
+    updated.optOutReason = "user_request";
+    await updated.save();
+
+    const restored = await CustomerService.updateCustomer(
+      owner._id,
+      customer._id,
+      { whatsappOptIn: true },
+    );
+    assert.equal(restored.whatsappOptIn, true);
+    assert.equal(restored.optedOut, false);
+    assert.equal(restored.optedOutAt, null);
+    assert.equal(restored.optOutReason, null);
   });
 
   it("soft deletes customers and removes them from list results", async () => {
