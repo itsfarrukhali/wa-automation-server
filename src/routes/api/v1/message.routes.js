@@ -8,6 +8,7 @@ import {
   markMessageRead,
   sendTemplateMessage,
   sendTextMessage,
+  streamMessageEvents,
 } from "../../../controllers/message.controller.js";
 import {
   analyticsValidator,
@@ -30,6 +31,7 @@ const router = Router();
 router.use(verifyToken, requireVerifiedEmail, requireStaff);
 
 router.get("/analytics", analyticsValidator, validate, getMessageAnalytics);
+router.get("/events", streamMessageEvents);
 router.get("/inbox", inboxValidator, validate, getInbox);
 router.get(
   "/conversations/:customerId",

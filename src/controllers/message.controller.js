@@ -1,6 +1,13 @@
 import ApiResponseUtil from "../utils/helpers/apiResponse.utils.js";
 import { asyncHandler } from "../utils/helpers/errorHandler.utils.js";
 import * as MessageService from "../services/message.service.js";
+import { getMyBusiness } from "../services/business.service.js";
+import { subscribeToBusinessEvents } from "../services/realtime.service.js";
+
+export const streamMessageEvents = asyncHandler(async (req, res) => {
+  const business = await getMyBusiness(req.user.userId);
+  subscribeToBusinessEvents({ businessId: business._id, req, res });
+});
 
 export const sendTextMessage = asyncHandler(async (req, res) => {
   const message = await MessageService.sendTextMessage(req.user.userId, req.body);
