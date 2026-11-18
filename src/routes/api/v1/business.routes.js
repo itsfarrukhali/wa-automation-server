@@ -4,6 +4,7 @@ import {
   getMyBusiness,
   getOnboardingStatus,
   getDashboard,
+  getWhatsAppConnectionStatus,
   onboardStep1,
   onboardStep2,
   onboardStep3,
@@ -38,6 +39,7 @@ import {
 import {
   verifyToken,
   requireVerifiedEmail,
+  requireOwner,
   requireAdmin,
 } from "../../../middlewares/auth.middleware.js";
 
@@ -53,6 +55,7 @@ router.use(verifyToken, requireVerifiedEmail);
 router.get("/me", getMyBusiness);
 router.get("/dashboard", getDashboard);
 router.get("/plan", getPlan);
+router.get("/whatsapp/status", requireOwner, getWhatsAppConnectionStatus);
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
 
@@ -70,6 +73,7 @@ router.patch("/profile", profileUpdateValidator, validate, updateProfile);
 router.patch("/settings", settingsValidator, validate, updateSettings);
 router.patch(
   "/whatsapp/reconnect",
+  requireOwner,
   whatsappReconnectValidator,
   validate,
   reconnectWhatsApp,

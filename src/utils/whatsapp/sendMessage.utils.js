@@ -97,7 +97,7 @@ export const sendWhatsAppMessage = async ({
     const message =
       redactSecretsFromText(data?.error?.message) ||
       `WhatsApp API request failed with status ${response.status}`;
-    const error = new AppError(message, 502);
+    const error = new AppError(message, response.status >= 500 ? 502 : 422);
     error.meta = {
       provider: "meta_whatsapp",
       status: response.status,

@@ -31,6 +31,13 @@ export const getDashboard = asyncHandler(async (req, res) => {
   return ApiResponseUtil.success(res, stats);
 });
 
+export const getWhatsAppConnectionStatus = asyncHandler(async (req, res) => {
+  const status = await BusinessService.getWhatsAppConnectionStatus(
+    req.user.userId,
+  );
+  return ApiResponseUtil.success(res, status);
+});
+
 // ─── Onboarding Steps ─────────────────────────────────────────────────────────
 
 export const onboardStep1 = asyncHandler(async (req, res) => {

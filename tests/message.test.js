@@ -231,7 +231,8 @@ describe("MessageService.sendTextMessage", () => {
           customerId: customer._id.toString(),
           text: "Hello",
         }),
-      /Invalid recipient/,
+      (error) =>
+        error.statusCode === 422 && /Invalid recipient/.test(error.message),
     );
 
     const failed = await MessageLog.findOne({ status: "failed" });

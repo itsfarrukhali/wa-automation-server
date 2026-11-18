@@ -385,6 +385,82 @@ export const reconnectWhatsApp = async (userId, data) => {
   return business;
 };
 
+export const getWhatsAppConnectionStatus = async (userId) => {
+  const business = await getOwnedBusiness(
+    userId,
+    "+whatsapp.accessToken +whatsapp.wabaId",
+  );
+  const whatsapp = business.whatsapp || {};
+  const base = {
+    connectionStatus: whatsapp.connectionStatus || "disconnected",
+    displayPhoneNumber: whatsapp.displayPhoneNumber || null,
+    verifiedName: whatsapp.verifiedName || null,
+    qualityRating: whatsapp.qualityRating || "UNKNOWN",
+    wabaIdSuffix: whatsapp.wabaId?.slice(-4) || null,
+    lastConnectedAt: whatsapp.lastConnectedAt || null,
+    tokenExpiresAt: whatsapp.tokenExpiresAt || null,
+    credentialsStored: Boolean(whatsapp.accessToken),
+  };
+
+  if (!whatsapp.accessToken || !whatsapp.phoneNumberId) {
+    return { ...base, health: "not_configured", tokenValid: false };
+  }
+
+  let accessToken;
+  try {
+    accessToken = whatsapp.decryptToken();
+  } catch {
+    return {
+      ...base,
+      health: "invalid",
+      tokenValid: false,
+      error: "Stored credentials cannot be decrypted. Reconnect WhatsApp once.",
+    };
+  }
+
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/${env.WHATSAPP_GRAPH_VERSION}/${encodeURIComponent(whatsapp.phoneNumberId)}?fields=id,display_phone_number,verified_name,quality_rating`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    const result = await response.json();
+
+    if (!response.ok || String(result.id) !== String(whatsapp.phoneNumberId)) {
+      const invalidToken = Number(result?.error?.code) === 190;
+      return {
+        ...base,
+        health: invalidToken ? "invalid" : "degraded",
+        tokenValid: !invalidToken,
+        error: invalidToken
+          ? "Meta rejected the stored token. Reconnect WhatsApp."
+          : redactSecretsFromText(result?.error?.message) ||
+            "Meta could not verify the connected number.",
+      };
+    }
+
+    return {
+      ...base,
+      health: "healthy",
+      tokenValid: true,
+      displayPhoneNumber:
+        result.display_phone_number || whatsapp.displayPhoneNumber || null,
+      verifiedName: result.verified_name || whatsapp.verifiedName || null,
+      qualityRating: result.quality_rating || whatsapp.qualityRating || "UNKNOWN",
+    };
+  } catch {
+    return {
+      ...base,
+      health: "unreachable",
+      tokenValid: null,
+      error:
+        "Meta is temporarily unreachable. Stored credentials were not changed.",
+    };
+  }
+};
+
 // ─── Profile Updates (post-onboarding) ────────────────────────────────────────
 
 export const updateProfile = async (userId, updates) => {

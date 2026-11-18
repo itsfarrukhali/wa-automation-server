@@ -209,6 +209,39 @@ describe("WhatsApp reconnect", () => {
         !error.message.includes(leakedToken),
     );
   });
+
+  it("checks a stored WhatsApp connection without requiring token re-entry", async () => {
+    const { user, business } = await seedUserAndBusiness();
+    business.whatsapp.phoneNumberId = "phone-1";
+    business.whatsapp.wabaId = "waba-1";
+    business.whatsapp.displayPhoneNumber = "+92 320 3939206";
+    business.whatsapp.verifiedName = "Zario";
+    business.whatsapp.connectionStatus = "connected";
+    business.whatsapp.lastConnectedAt = new Date();
+    business.whatsapp.accessToken = JSON.stringify(
+      business.whatsapp.encryptToken("permanent-system-user-token"),
+    );
+    business.markModified("whatsapp");
+    await business.save();
+
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({
+        id: "phone-1",
+        display_phone_number: "+92 320 3939206",
+        verified_name: "Zario",
+        quality_rating: "GREEN",
+      }),
+    });
+
+    const status = await BusinessService.getWhatsAppConnectionStatus(user._id);
+
+    assert.equal(status.health, "healthy");
+    assert.equal(status.tokenValid, true);
+    assert.equal(status.credentialsStored, true);
+    assert.equal(status.displayPhoneNumber, "+92 320 3939206");
+    assert.equal(status.wabaIdSuffix, "ba-1");
+  });
 });
 
 beforeEach(async () => {
