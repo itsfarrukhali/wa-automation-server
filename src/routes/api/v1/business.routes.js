@@ -5,7 +5,6 @@ import {
   getOnboardingStatus,
   getDashboard,
   getWhatsAppConnectionStatus,
-  runSentryDiagnostic,
   onboardStep1,
   onboardStep2,
   onboardStep3,
@@ -57,7 +56,6 @@ router.get("/me", getMyBusiness);
 router.get("/dashboard", getDashboard);
 router.get("/plan", getPlan);
 router.get("/whatsapp/status", requireOwner, getWhatsAppConnectionStatus);
-router.post("/diagnostics/sentry", requireOwner, runSentryDiagnostic);
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
 
