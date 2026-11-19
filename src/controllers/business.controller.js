@@ -13,6 +13,7 @@
 import { asyncHandler } from "../utils/helpers/errorHandler.utils.js";
 import ApiResponseUtil from "../utils/helpers/apiResponse.utils.js";
 import * as BusinessService from "../services/business.service.js";
+import * as Sentry from "@sentry/node";
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,45 @@ export const getWhatsAppConnectionStatus = asyncHandler(async (req, res) => {
     req.user.userId,
   );
   return ApiResponseUtil.success(res, status);
+});
+
+export const runSentryDiagnostic = asyncHandler(async (req, res) => {
+  const client = Sentry.getClient();
+  if (!client?.getDsn()) {
+    return ApiResponseUtil.error(
+      res,
+      "Backend Sentry is not configured",
+      503,
+    );
+  }
+
+  const eventId = Sentry.captureException(
+    new Error("ZARIO_BACKEND_SENTRY_DIAGNOSTIC"),
+    {
+      tags: {
+        diagnostic: "manual",
+        surface: "backend",
+      },
+      extra: {
+        requestId: req.requestId,
+      },
+    },
+  );
+  const delivered = await Sentry.flush(5000);
+
+  if (!delivered) {
+    return ApiResponseUtil.error(
+      res,
+      "Sentry did not confirm delivery before the timeout",
+      502,
+    );
+  }
+
+  return ApiResponseUtil.success(
+    res,
+    { eventId },
+    "Backend Sentry diagnostic delivered",
+  );
 });
 
 // ─── Onboarding Steps ─────────────────────────────────────────────────────────
