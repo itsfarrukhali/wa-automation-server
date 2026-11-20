@@ -571,6 +571,11 @@ describe("Admin Module", function () {
       expect(res.body.data._devResetToken)
         .to.be.a("string")
         .with.length.greaterThan(0);
+      expect(transportStub.calledOnce).to.equal(true);
+      expect(transportStub.firstCall.args[0]).to.include({
+        disableFileAccess: true,
+        disableUrlAccess: true,
+      });
 
       // Token is persisted in DB
       const updated = await User.findById(owner._id).select(

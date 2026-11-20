@@ -25,6 +25,8 @@ const getTransporter = async () => {
 
   const t = nodemailer.createTransport({
     service: "gmail",
+    disableFileAccess: true,
+    disableUrlAccess: true,
     auth: {
       user: env.GMAIL_USER,
       pass: env.GMAIL_APP_PASSWORD,
