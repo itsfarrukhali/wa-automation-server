@@ -1,9 +1,24 @@
 import assert from "node:assert/strict";
+import request from "supertest";
 
+import app from "../app.js";
 import { redactSensitive } from "../src/services/audit.service.js";
 import { redactSecretsFromText } from "../src/utils/security/redactSecrets.utils.js";
 
 describe("Operations helpers", () => {
+  it("rejects an untrusted browser origin as an operational 403", async () => {
+    const response = await request(app)
+      .options("/api/v1/auth/refresh")
+      .set("Origin", "https://untrusted-preview.example")
+      .set("Access-Control-Request-Method", "POST");
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body.success, false);
+    assert.equal(response.body.message, "Origin is not allowed by CORS.");
+    assert.ok(response.body.requestId);
+    assert.equal(response.headers["access-control-allow-origin"], undefined);
+  });
+
   it("redacts Meta and bearer tokens embedded inside error messages", () => {
     const metaToken = `EAA${"a".repeat(120)}`;
     const message = redactSecretsFromText(

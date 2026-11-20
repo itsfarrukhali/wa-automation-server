@@ -13,6 +13,7 @@ import { rateLimit } from "./src/middlewares/rateLimit.middleware.js";
 import { requestLogger } from "./src/middlewares/requestLogger.middleware.js";
 import logger from "./src/lib/logger.js";
 import { redactSecretsFromText } from "./src/utils/security/redactSecrets.utils.js";
+import { AppError } from "./src/utils/helpers/errorHandler.utils.js";
 import { isRedisConfigured, pingRedis } from "./src/lib/redis.js";
 import userRouter from "./src/routes/api/v1/auth.routes.js";
 import businessRouter from "./src/routes/api/v1/business.routes.js";
@@ -89,9 +90,7 @@ app.use(
         return callback(null, true);
       }
 
-      return callback(
-        new Error(`CORS blocked for origin: ${origin || "unknown"}`),
-      );
+      return callback(new AppError("Origin is not allowed by CORS.", 403));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
