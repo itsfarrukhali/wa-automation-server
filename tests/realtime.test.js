@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import {
+  buildMessageEventData,
   getRealtimeClientCount,
   publishBusinessEvent,
   subscribeToBusinessEvents,
@@ -30,6 +31,26 @@ const createStream = () => {
 };
 
 describe("Realtime message events", () => {
+  it("serializes only the message fields needed by realtime clients", () => {
+    const data = buildMessageEventData({
+      _id: "message-1",
+      businessId: "must-not-leak",
+      customerId: "customer-1",
+      direction: "out",
+      contentType: "text",
+      content: "Hello",
+      status: "delivered",
+      type: "manual",
+      sentAt: new Date("2026-11-20T00:00:00.000Z"),
+      createdAt: new Date("2026-11-20T00:00:00.000Z"),
+    });
+
+    assert.equal(data.customerId, "customer-1");
+    assert.equal(data.message.status, "delivered");
+    assert.equal(data.message.sentAt, "2026-11-20T00:00:00.000Z");
+    assert.equal(data.message.businessId, undefined);
+  });
+
   it("streams business events only to that business and cleans up", () => {
     const first = createStream();
     const second = createStream();

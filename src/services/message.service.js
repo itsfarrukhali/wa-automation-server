@@ -6,7 +6,10 @@ import { getMyBusiness } from "./business.service.js";
 import { resolveWhatsAppMessagingCredentials } from "./whatsappCredentials.service.js";
 import { incrementTemplateUsageByName } from "./template.service.js";
 import { AppError } from "../utils/helpers/errorHandler.utils.js";
-import { publishBusinessEvent } from "./realtime.service.js";
+import {
+  buildMessageEventData,
+  publishBusinessEvent,
+} from "./realtime.service.js";
 import {
   buildTemplatePayload,
   buildTextPayload,
@@ -176,19 +179,19 @@ export const sendTextMessage = async (userId, data) => {
       }),
     });
     await markOutboundSent(message, response);
-    publishBusinessEvent(business._id, "message.updated", {
-      customerId: String(customer._id),
-      messageId: String(message._id),
-      status: message.status,
-    });
+    publishBusinessEvent(
+      business._id,
+      "message.updated",
+      buildMessageEventData(message),
+    );
     return message;
   } catch (error) {
     await markOutboundFailed(message, error);
-    publishBusinessEvent(business._id, "message.updated", {
-      customerId: String(customer._id),
-      messageId: String(message._id),
-      status: message.status,
-    });
+    publishBusinessEvent(
+      business._id,
+      "message.updated",
+      buildMessageEventData(message),
+    );
     throw error;
   }
 };
@@ -230,19 +233,19 @@ export const sendTemplateMessage = async (userId, data) => {
       name: data.templateName,
       language: data.language || "en_US",
     });
-    publishBusinessEvent(business._id, "message.updated", {
-      customerId: String(customer._id),
-      messageId: String(message._id),
-      status: message.status,
-    });
+    publishBusinessEvent(
+      business._id,
+      "message.updated",
+      buildMessageEventData(message),
+    );
     return message;
   } catch (error) {
     await markOutboundFailed(message, error);
-    publishBusinessEvent(business._id, "message.updated", {
-      customerId: String(customer._id),
-      messageId: String(message._id),
-      status: message.status,
-    });
+    publishBusinessEvent(
+      business._id,
+      "message.updated",
+      buildMessageEventData(message),
+    );
     throw error;
   }
 };

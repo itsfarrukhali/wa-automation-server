@@ -5,7 +5,10 @@ import MessageLog from "../models/messagelog.model.js";
 import { env } from "../lib/env.js";
 import { processInboundAutomations } from "./automation.service.js";
 import { AppError } from "../utils/helpers/errorHandler.utils.js";
-import { publishBusinessEvent } from "./realtime.service.js";
+import {
+  buildMessageEventData,
+  publishBusinessEvent,
+} from "./realtime.service.js";
 import {
   normalizeWhatsAppPhone,
   toE164PakistanPhone,
@@ -281,11 +284,11 @@ const processInboundMessage = async ({ business, value, message }) => {
       from: message.from,
     });
 
-    publishBusinessEvent(business._id, "message.updated", {
-      customerId: String(customer._id),
-      messageId: String(log._id),
-      action: "customer_opted_out",
-    });
+    publishBusinessEvent(
+      business._id,
+      "message.updated",
+      buildMessageEventData(log, { action: "customer_opted_out" }),
+    );
 
     return { action: "customer_opted_out", messageId: log._id };
   }
@@ -299,11 +302,11 @@ const processInboundMessage = async ({ business, value, message }) => {
       from: message.from,
     });
 
-    publishBusinessEvent(business._id, "message.updated", {
-      customerId: String(customer._id),
-      messageId: String(log._id),
-      action: "customer_opted_in",
-    });
+    publishBusinessEvent(
+      business._id,
+      "message.updated",
+      buildMessageEventData(log, { action: "customer_opted_in" }),
+    );
 
     return { action: "customer_opted_in", messageId: log._id };
   }
@@ -315,11 +318,11 @@ const processInboundMessage = async ({ business, value, message }) => {
     text: content,
   });
 
-  publishBusinessEvent(business._id, "message.updated", {
-    customerId: String(customer._id),
-    messageId: String(log._id),
-    action: "created_inbound",
-  });
+  publishBusinessEvent(
+    business._id,
+    "message.updated",
+    buildMessageEventData(log, { action: "created_inbound" }),
+  );
 
   return { action: "created_inbound", messageId: log._id, automations };
 };
@@ -388,12 +391,11 @@ const processStatusUpdate = async ({ business, status }) => {
     billable: status.pricing?.billable,
   });
 
-  publishBusinessEvent(business._id, "message.updated", {
-    customerId: String(message.customerId),
-    messageId: String(message._id),
-    status: mappedStatus,
-    action: "updated_status",
-  });
+  publishBusinessEvent(
+    business._id,
+    "message.updated",
+    buildMessageEventData(message, { action: "updated_status" }),
+  );
 
   return {
     action: "updated_status",

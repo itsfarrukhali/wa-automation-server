@@ -3,6 +3,33 @@ const clientsByBusiness = new Map();
 const serializeEvent = (event, data) =>
   `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 
+const toIsoString = (value) =>
+  value instanceof Date ? value.toISOString() : value;
+
+export const buildMessageEventData = (message, extra = {}) => {
+  const source = message?.toObject ? message.toObject() : message;
+  const customerId = String(source?.customerId?._id || source?.customerId || "");
+
+  return {
+    customerId,
+    messageId: String(source?._id || ""),
+    message: {
+      _id: String(source?._id || ""),
+      direction: source?.direction,
+      contentType: source?.contentType,
+      content: source?.content,
+      status: source?.status,
+      type: source?.type,
+      waCustomerPhone: source?.waCustomerPhone,
+      customerId,
+      staffId: source?.staffId,
+      sentAt: toIsoString(source?.sentAt),
+      createdAt: toIsoString(source?.createdAt),
+    },
+    ...extra,
+  };
+};
+
 export const subscribeToBusinessEvents = ({ businessId, req, res }) => {
   const key = String(businessId);
   const clients = clientsByBusiness.get(key) || new Set();
