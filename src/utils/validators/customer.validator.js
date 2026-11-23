@@ -17,6 +17,14 @@ const SOURCES = [
 ];
 const STATUSES = ["active", "inactive", "blocked"];
 const TAGS = ["vip", "new", "inactive", "regular", "whale", "at_risk", "lost"];
+const WHATSAPP_OPT_IN_SOURCES = [
+  "customer_request",
+  "website_form",
+  "written_consent",
+  "verbal_consent",
+  "whatsapp_inbound",
+  "imported_record",
+];
 
 export const validate = (req, res, next) => {
   const errors = validationResult(req);
@@ -67,6 +75,10 @@ const optionalRules = [
     .optional()
     .isBoolean()
     .withMessage("whatsappOptIn must be a boolean"),
+  body("whatsappOptInSource")
+    .optional()
+    .isIn(WHATSAPP_OPT_IN_SOURCES)
+    .withMessage("Invalid WhatsApp opt-in source"),
   body("consentGiven")
     .optional()
     .isBoolean()
@@ -93,6 +105,12 @@ export const createCustomerValidator = [
     .custom((value) => PHONE_REGEX.test(value.replace(/[-\s]/g, "")))
     .withMessage("Invalid Pakistani phone number"),
   ...optionalRules,
+  body().custom((value) => {
+    if (value.whatsappOptIn === true && !value.whatsappOptInSource) {
+      throw new Error("Record how the customer gave WhatsApp permission");
+    }
+    return true;
+  }),
 ];
 
 export const updateCustomerValidator = [
@@ -109,6 +127,12 @@ export const updateCustomerValidator = [
     .custom((value) => PHONE_REGEX.test(value.replace(/[-\s]/g, "")))
     .withMessage("Invalid Pakistani phone number"),
   ...optionalRules,
+  body().custom((value) => {
+    if (value.whatsappOptIn === true && !value.whatsappOptInSource) {
+      throw new Error("Record how the customer gave WhatsApp permission");
+    }
+    return true;
+  }),
 ];
 
 export const customerIdValidator = [

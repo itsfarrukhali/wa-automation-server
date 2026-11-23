@@ -202,6 +202,20 @@ export const sendTemplateMessage = async (userId, data) => {
 
   const customer = await getCustomerForBusiness(business._id, data.customerId);
   const recipient = customer.whatsappNumber || customer.phone;
+  const language = data.language || "en_US";
+  const approvedTemplate = business.whatsapp?.templates?.find(
+    (template) =>
+      template.name === data.templateName &&
+      template.language === language &&
+      template.status === "APPROVED",
+  );
+
+  if (!approvedTemplate) {
+    throw new AppError(
+      "Select a WhatsApp template that is approved in Meta and synced to Zario.",
+      422,
+    );
+  }
 
   const message = await createPendingOutboundLog({
     business,
@@ -212,7 +226,7 @@ export const sendTemplateMessage = async (userId, data) => {
     content: data.templateName,
     template: {
       name: data.templateName,
-      language: data.language || "en_US",
+      language,
       components: data.components || [],
     },
   });
@@ -223,7 +237,7 @@ export const sendTemplateMessage = async (userId, data) => {
       payload: buildTemplatePayload({
         to: recipient,
         templateName: data.templateName,
-        language: data.language,
+        language,
         components: data.components,
       }),
     });
@@ -231,7 +245,7 @@ export const sendTemplateMessage = async (userId, data) => {
     await incrementTemplateUsageByName({
       businessId: business._id,
       name: data.templateName,
-      language: data.language || "en_US",
+      language,
     });
     publishBusinessEvent(
       business._id,
@@ -371,17 +385,39 @@ export const getConversationThread = async (
     filter.sentAt = { $lt: new Date(before) };
   }
 
-  const messages = await MessageLog.find(filter)
-    .sort({ sentAt: -1, _id: -1 })
-    .limit(safeLimit)
-    .populate(
-      "customerId",
-      "name phone whatsappNumber waProfileName optedOut whatsappOptIn",
-    )
-    .populate("staffId", "name");
+  const customerFilter = {
+    _id: customerId,
+    businessId: business._id,
+    status: { $ne: "deleted" },
+    deletedAt: null,
+  };
+  const windowOpenedAt = new Date(Date.now() - CUSTOMER_SERVICE_WINDOW_MS);
+  const [customer, messages, recentInbound] = await Promise.all([
+    Customer.findOne(customerFilter).select(
+      "name phone whatsappNumber waProfileName optedOut whatsappOptIn whatsappOptInAt whatsappOptInSource",
+    ),
+    MessageLog.find(filter)
+      .sort({ sentAt: -1, _id: -1 })
+      .limit(safeLimit)
+      .populate(
+        "customerId",
+        "name phone whatsappNumber waProfileName optedOut whatsappOptIn",
+      )
+      .populate("staffId", "name"),
+    MessageLog.exists({
+      businessId: business._id,
+      customerId,
+      direction: "in",
+      sentAt: { $gte: windowOpenedAt },
+    }),
+  ]);
+
+  if (!customer) throw new AppError("Customer not found", 404);
 
   return {
     customerId,
+    customer,
+    customerServiceWindowOpen: Boolean(recentInbound),
     messages,
     nextBefore: messages.at(-1)?.sentAt || null,
   };

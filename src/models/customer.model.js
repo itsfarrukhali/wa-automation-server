@@ -338,6 +338,18 @@ const customerSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    whatsappOptInAt: Date,
+    whatsappOptInSource: {
+      type: String,
+      enum: [
+        "customer_request",
+        "website_form",
+        "written_consent",
+        "verbal_consent",
+        "whatsapp_inbound",
+        "imported_record",
+      ],
+    },
     consentDate: Date,
     dataRetentionDate: {
       type: Date,
@@ -670,9 +682,11 @@ customerSchema.methods.optOut = async function (
 };
 
 // Opt-in again
-customerSchema.methods.optIn = async function () {
+customerSchema.methods.optIn = async function (source = "whatsapp_inbound") {
   this.optedOut = false;
   this.whatsappOptIn = true;
+  this.whatsappOptInAt = new Date();
+  this.whatsappOptInSource = source;
   this.optedOutAt = null;
   this.optOutReason = null;
   this.waOptOutCategories = [];

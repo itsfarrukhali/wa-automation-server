@@ -173,6 +173,8 @@ const findOrCreateCustomer = async ({ businessId, contact, from }) => {
       waProfileName: profileName,
       source: "whatsapp",
       whatsappOptIn: true,
+      whatsappOptInAt: new Date(),
+      whatsappOptInSource: "whatsapp_inbound",
       consentGiven: true,
     });
   } catch (error) {

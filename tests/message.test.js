@@ -389,6 +389,65 @@ describe("MessageService.sendTemplateMessage", () => {
     assert.equal(updatedBusiness.whatsapp.templates[0].usageCount, 1);
     assert.ok(updatedBusiness.whatsapp.templates[0].lastUsed);
   });
+
+  it("blocks templates that are not approved and synced from Meta", async () => {
+    const { user, business, customer } = await seedBusinessContext();
+    business.whatsapp.templates = [
+      {
+        name: "pending_offer",
+        language: "en_US",
+        category: "MARKETING",
+        status: "PENDING",
+      },
+    ];
+    await business.save();
+
+    let providerCalled = false;
+    setWhatsAppFetchImplementation(async () => {
+      providerCalled = true;
+      throw new Error("Provider must not be called");
+    });
+
+    await assert.rejects(
+      () =>
+        MessageService.sendTemplateMessage(user._id.toString(), {
+          customerId: customer._id.toString(),
+          templateName: "pending_offer",
+          language: "en_US",
+        }),
+      /approved in Meta and synced to Zario/i,
+    );
+
+    assert.equal(providerCalled, false);
+    assert.equal(await MessageLog.countDocuments({ direction: "out" }), 0);
+  });
+});
+
+describe("MessageService.getConversationThread", () => {
+  it("returns customer context for a new conversation with no messages", async () => {
+    const { user, customer } = await seedBusinessContext();
+
+    const thread = await MessageService.getConversationThread(
+      user._id.toString(),
+      customer._id.toString(),
+    );
+
+    assert.equal(thread.customer._id.toString(), customer._id.toString());
+    assert.equal(thread.customerServiceWindowOpen, false);
+    assert.deepEqual(thread.messages, []);
+  });
+
+  it("reports an open service window after a recent inbound message", async () => {
+    const { user, business, customer } = await seedBusinessContext();
+    await openCustomerServiceWindow({ business, customer });
+
+    const thread = await MessageService.getConversationThread(
+      user._id.toString(),
+      customer._id.toString(),
+    );
+
+    assert.equal(thread.customerServiceWindowOpen, true);
+  });
 });
 
 describe("WebhookService", () => {

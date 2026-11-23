@@ -93,6 +93,13 @@ export const createCustomer = async (userId, data) => {
   const { business, businessId } = await getBusinessContext(userId);
   await assertPlanCapacity(business);
 
+  if (data.whatsappOptIn && !data.whatsappOptInSource) {
+    throw new AppError(
+      "Record how the customer gave WhatsApp permission.",
+      422,
+    );
+  }
+
   try {
     const customer = await Customer.create({
       ...data,
@@ -102,6 +109,7 @@ export const createCustomer = async (userId, data) => {
         : undefined,
       businessId,
       source: data.source || "manual",
+      whatsappOptInAt: data.whatsappOptIn ? new Date() : undefined,
       lastUpdatedBy: userId,
     });
 
@@ -202,6 +210,7 @@ export const updateCustomer = async (userId, customerId, updates) => {
     "privateNotes",
     "customFields",
     "whatsappOptIn",
+    "whatsappOptInSource",
     "consentGiven",
     "status",
   ];
@@ -216,6 +225,13 @@ export const updateCustomer = async (userId, customerId, updates) => {
   }
 
   if (updates.whatsappOptIn === true) {
+    if (!updates.whatsappOptInSource) {
+      throw new AppError(
+        "Record how the customer gave WhatsApp permission.",
+        422,
+      );
+    }
+    customer.whatsappOptInAt = new Date();
     customer.optedOutAt = null;
     customer.optOutReason = null;
     customer.waOptOutCategories = [];

@@ -223,12 +223,39 @@ describe("Customer service", () => {
     const restored = await CustomerService.updateCustomer(
       owner._id,
       customer._id,
-      { whatsappOptIn: true },
+      {
+        whatsappOptIn: true,
+        whatsappOptInSource: "customer_request",
+      },
     );
     assert.equal(restored.whatsappOptIn, true);
     assert.equal(restored.optedOut, false);
     assert.equal(restored.optedOutAt, null);
     assert.equal(restored.optOutReason, null);
+    assert.equal(restored.whatsappOptInSource, "customer_request");
+    assert.ok(restored.whatsappOptInAt);
+  });
+
+  it("requires opt-in evidence before enabling WhatsApp messages", async () => {
+    await assert.rejects(
+      () =>
+        CustomerService.createCustomer(owner._id, {
+          name: "Missing evidence",
+          phone: "03001234567",
+          whatsappOptIn: true,
+        }),
+      (error) => error.statusCode === 422,
+    );
+
+    const customer = await CustomerService.createCustomer(owner._id, {
+      name: "Recorded permission",
+      phone: "03001234567",
+      whatsappOptIn: true,
+      whatsappOptInSource: "written_consent",
+    });
+
+    assert.equal(customer.whatsappOptInSource, "written_consent");
+    assert.ok(customer.whatsappOptInAt);
   });
 
   it("soft deletes customers and removes them from list results", async () => {
