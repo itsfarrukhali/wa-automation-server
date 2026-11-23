@@ -516,6 +516,65 @@ describe("WebhookService", () => {
     assert.equal(inbox.conversations[0].needsHuman, true);
   });
 
+  it("clears unread and needs-reply state when a conversation is opened", async () => {
+    const { user, business, customer } = await seedBusinessContext();
+    await MessageLog.create({
+      businessId: business._id,
+      customerId: customer._id,
+      type: "inbound",
+      direction: "in",
+      contentType: "text",
+      content: "Please send the details",
+      status: "delivered",
+      waMessageId: "wamid.inbox-read-1",
+      requiredHumanIntervention: true,
+    });
+
+    const result = await MessageService.markConversationRead(
+      user._id.toString(),
+      customer._id.toString(),
+    );
+    assert.equal(result.updated, 1);
+
+    const inbox = await MessageService.getInbox(user._id.toString(), {
+      status: "all",
+    });
+    assert.equal(inbox.conversations[0].unreadCount, 0);
+    assert.equal(inbox.conversations[0].needsHuman, false);
+  });
+
+  it("does not keep needs-reply active after a newer outbound message", async () => {
+    const { user, business, customer } = await seedBusinessContext();
+    await MessageLog.create({
+      businessId: business._id,
+      customerId: customer._id,
+      type: "inbound",
+      direction: "in",
+      contentType: "text",
+      content: "Can you help?",
+      status: "delivered",
+      waMessageId: "wamid.inbox-old-inbound",
+      requiredHumanIntervention: true,
+      sentAt: new Date(Date.now() - 60_000),
+    });
+    await MessageLog.create({
+      businessId: business._id,
+      customerId: customer._id,
+      staffId: user._id,
+      type: "manual",
+      direction: "out",
+      contentType: "text",
+      content: "Details sent",
+      status: "sent",
+      sentAt: new Date(),
+    });
+
+    const inbox = await MessageService.getInbox(user._id.toString(), {
+      status: "all",
+    });
+    assert.equal(inbox.conversations[0].needsHuman, false);
+  });
+
   it("sends an automation rule reply when inbound text matches keywords", async () => {
     const { user, business } = await seedBusinessContext();
     await AutomationRule.create({

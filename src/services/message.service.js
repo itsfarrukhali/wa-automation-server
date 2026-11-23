@@ -323,7 +323,9 @@ export const getInbox = async (
         lastMessage: message,
         lastMessageAt: message.sentAt || message.createdAt,
         unreadCount: 0,
-        needsHuman: false,
+        needsHuman:
+          message.direction === "in" &&
+          Boolean(message.requiredHumanIntervention),
       });
     }
 
@@ -334,9 +336,6 @@ export const getInbox = async (
 
     if (message.direction === "in" && !readByStaff) {
       conversation.unreadCount += 1;
-    }
-    if (message.direction === "in" && message.requiredHumanIntervention) {
-      conversation.needsHuman = true;
     }
   }
 
@@ -406,6 +405,43 @@ export const getMessage = async (userId, messageId) => {
 export const markMessageRead = async (userId, messageId) => {
   const message = await getMessage(userId, messageId);
   return message.markAsRead(userId);
+};
+
+export const markConversationRead = async (userId, customerId) => {
+  ensureObjectId(customerId, "customer ID");
+  const business = await getMyBusiness(userId);
+  const readAt = new Date();
+
+  const result = await MessageLog.updateMany(
+    {
+      businessId: business._id,
+      customerId,
+      direction: "in",
+      $or: [
+        { requiredHumanIntervention: true },
+        {
+          readReceipts: {
+            $not: { $elemMatch: { readerType: "staff" } },
+          },
+        },
+      ],
+    },
+    {
+      $set: {
+        status: "read",
+        requiredHumanIntervention: false,
+      },
+      $push: {
+        readReceipts: {
+          readAt,
+          readerType: "staff",
+          readerId: userId,
+        },
+      },
+    },
+  );
+
+  return { updated: result.modifiedCount };
 };
 
 export const getMessageAnalytics = async (

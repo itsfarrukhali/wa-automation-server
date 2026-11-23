@@ -65,6 +65,14 @@ export const markMessageRead = asyncHandler(async (req, res) => {
   return ApiResponseUtil.success(res, { message }, "Message marked as read");
 });
 
+export const markConversationRead = asyncHandler(async (req, res) => {
+  const result = await MessageService.markConversationRead(
+    req.user.userId,
+    req.params.customerId,
+  );
+  return ApiResponseUtil.success(res, result, "Conversation marked as read");
+});
+
 export const getMessageAnalytics = asyncHandler(async (req, res) => {
   const result = await MessageService.getMessageAnalytics(
     req.user.userId,

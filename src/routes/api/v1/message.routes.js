@@ -6,6 +6,7 @@ import {
   getMessageAnalytics,
   listMessages,
   markMessageRead,
+  markConversationRead,
   sendTemplateMessage,
   sendTextMessage,
   streamMessageEvents,
@@ -38,6 +39,12 @@ router.get(
   conversationValidator,
   validate,
   getConversationThread,
+);
+router.patch(
+  "/conversations/:customerId/read",
+  conversationValidator,
+  validate,
+  markConversationRead,
 );
 router.get("/", listMessagesValidator, validate, listMessages);
 router.post("/text", sendTextValidator, validate, sendTextMessage);
