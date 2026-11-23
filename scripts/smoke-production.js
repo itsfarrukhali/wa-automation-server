@@ -1,6 +1,7 @@
 const DEFAULT_FRONTEND_URL = "https://zario-web.vercel.app";
 const DEFAULT_BACKEND_URL = "https://wa-automation-server-vyzg.onrender.com";
 const REQUEST_TIMEOUT_MS = 30_000;
+const BACKEND_WAKE_TIMEOUT_MS = 90_000;
 
 const frontendUrl = normalizeBaseUrl(
   process.env.SMOKE_FRONTEND_URL || DEFAULT_FRONTEND_URL,
@@ -19,17 +20,18 @@ const record = (name, status, durationMs, detail = "") => {
 };
 
 const request = async (url, options = {}) => {
+  const { timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = performance.now();
 
   try {
     const response = await fetch(url, {
       redirect: "follow",
-      ...options,
+      ...fetchOptions,
       headers: {
         "user-agent": "zario-production-smoke/1.0",
-        ...options.headers,
+        ...fetchOptions.headers,
       },
       signal: controller.signal,
     });
@@ -44,6 +46,11 @@ const request = async (url, options = {}) => {
       }
     }
     return { response, durationMs, text, json };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Timed out after ${timeoutMs}ms`);
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
@@ -55,10 +62,7 @@ const runCheck = async (name, check) => {
     const detail = await check();
     record(name, "PASS", Math.round(performance.now() - startedAt), detail);
   } catch (error) {
-    const message =
-      error?.name === "AbortError"
-        ? `Timed out after ${REQUEST_TIMEOUT_MS}ms`
-        : String(error?.message || error);
+    const message = String(error?.message || error);
     record(name, "FAIL", Math.round(performance.now() - startedAt), message);
   }
 };
@@ -120,6 +124,14 @@ const publicChecks = async () => {
     checkFrontendPage("/data-deletion", "Data Deletion"),
   );
   await runCheck("Frontend static assets", checkFrontendAssets);
+
+  await runCheck("Backend wake-up", async () => {
+    const result = await request(`${backendUrl}/api/health`, {
+      timeoutMs: BACKEND_WAKE_TIMEOUT_MS,
+    });
+    expectStatus(result.response.status, 200, "Backend wake-up");
+    return `service responded (${result.durationMs}ms)`;
+  });
 
   await runCheck("Backend health", async () => {
     const result = await request(`${backendUrl}/api/health`);

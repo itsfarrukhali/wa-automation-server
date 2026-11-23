@@ -358,6 +358,19 @@ export const launchCampaign = async (
     throw new AppError(`Cannot launch a ${campaign.status} campaign.`, 409);
   }
 
+  if (sendMode === "template") {
+    const templateName = campaign.whatsappTemplate?.templateName;
+    const selectedTemplate = business.whatsapp?.templates?.find(
+      (template) => template.name === templateName,
+    );
+    if (!templateName || selectedTemplate?.status !== "APPROVED") {
+      throw new AppError(
+        "Select an approved WhatsApp template and sync its latest Meta status before launching.",
+        422,
+      );
+    }
+  }
+
   const recipients = await findEligibleRecipients(
     business._id,
     campaign.target,
