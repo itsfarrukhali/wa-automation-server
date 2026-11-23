@@ -268,8 +268,7 @@ const campaignSchema = new mongoose.Schema(
       templateId: String, // Meta template ID
       language: {
         type: String,
-        enum: ["en", "ur"],
-        default: "ur",
+        default: "en_US",
       },
       category: {
         type: String,

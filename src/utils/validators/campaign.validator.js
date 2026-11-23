@@ -160,8 +160,8 @@ export const createCampaignValidator = [
     .withMessage("whatsappTemplate.templateName is required"),
   body("whatsappTemplate.language")
     .optional()
-    .isIn(["en", "ur"])
-    .withMessage("whatsappTemplate.language must be en or ur"),
+    .matches(/^[a-z]{2,3}(?:_[A-Z]{2})?$/)
+    .withMessage("whatsappTemplate.language must be a valid Meta locale such as en_US or ur"),
   body("whatsappTemplate.category")
     .optional()
     .isIn(["UTILITY", "MARKETING", "AUTHENTICATION"])
