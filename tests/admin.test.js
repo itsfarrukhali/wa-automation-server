@@ -1299,6 +1299,30 @@ describe("Admin Module", function () {
       expect(goneBiz).to.be.null;
     });
 
+    it("deleting staff does not delete the business they work for", async () => {
+      const businessOwner = await createUser({
+        username: "staff_biz_owner",
+        email: "staff_biz_owner@test.com",
+      });
+      const sharedBusiness = await createBusiness(businessOwner._id);
+      const staffToDelete = await createUser({
+        role: "staff",
+        username: "staff_to_delete",
+        email: "staff_to_delete@test.com",
+      });
+      staffToDelete.businessId = sharedBusiness._id;
+      await staffToDelete.save();
+
+      const res = await request(app)
+        .delete(`/api/v1/superadmin/users/${staffToDelete._id}`)
+        .set("Authorization", `Bearer ${superAdminToken}`);
+
+      expect(res).to.have.status(200);
+      expect(res.body.data.deletedBusinessId).to.be.null;
+      expect(await User.findById(staffToDelete._id)).to.be.null;
+      expect(await Business.findById(sharedBusiness._id)).to.not.be.null;
+    });
+
     it("superadmin cannot delete themselves → 403", async () => {
       const res = await request(app)
         .delete(`/api/v1/superadmin/users/${superAdmin._id}`)

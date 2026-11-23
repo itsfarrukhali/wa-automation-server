@@ -290,6 +290,21 @@ describe("Service Catalog service", () => {
 });
 
 describe("Service Catalog API", () => {
+  const createStaffToken = async () => {
+    const staff = await User.create({
+      email: `service-staff-${Date.now()}@test.com`,
+      username: `service_staff_${Date.now()}`,
+      password: "Password123!",
+      name: "Service Staff",
+      isEmailVerified: true,
+      consentToDataProcessing: true,
+      role: "staff",
+      businessId: business._id,
+    });
+
+    return staff.generateAuthToken();
+  };
+
   it("requires authentication", async () => {
     const response = await request(app).get("/api/v1/services");
     assert.equal(response.status, 401);
@@ -325,5 +340,32 @@ describe("Service Catalog API", () => {
       .set("Authorization", `Bearer ${owner.generateAuthToken()}`);
 
     assert.equal(response.status, 422);
+  });
+
+  it("allows staff to read services but blocks owner-only configuration", async () => {
+    const token = await createStaffToken();
+    const listed = await request(app)
+      .get("/api/v1/services")
+      .set("Authorization", `Bearer ${token}`);
+    const created = await request(app)
+      .post("/api/v1/services")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: "Forbidden Service", price: 1000, duration: 30 });
+
+    assert.equal(listed.status, 200);
+    assert.equal(created.status, 403);
+  });
+
+  it("blocks staff from owner-only campaign and report routes", async () => {
+    const token = await createStaffToken();
+    const campaigns = await request(app)
+      .get("/api/v1/campaigns")
+      .set("Authorization", `Bearer ${token}`);
+    const reports = await request(app)
+      .get("/api/v1/reports/customers")
+      .set("Authorization", `Bearer ${token}`);
+
+    assert.equal(campaigns.status, 403);
+    assert.equal(reports.status, 403);
   });
 });

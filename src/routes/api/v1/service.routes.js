@@ -17,6 +17,7 @@ import {
   validate,
 } from "../../../utils/validators/service.validator.js";
 import {
+  requireOwner,
   requireStaff,
   requireVerifiedEmail,
   verifyToken,
@@ -26,18 +27,19 @@ const router = Router();
 
 router.use(verifyToken, requireVerifiedEmail, requireStaff);
 
-router.get("/analytics", getServiceAnalytics);
-router.post("/import", importServicesValidator, validate, importServices);
+router.get("/analytics", requireOwner, getServiceAnalytics);
+router.post("/import", requireOwner, importServicesValidator, validate, importServices);
 router.get("/", listServicesValidator, validate, listServices);
-router.post("/", createServiceValidator, validate, createService);
+router.post("/", requireOwner, createServiceValidator, validate, createService);
 router.get("/:serviceId", serviceIdValidator, validate, getService);
 router.patch(
   "/:serviceId",
+  requireOwner,
   serviceIdValidator,
   updateServiceValidator,
   validate,
   updateService,
 );
-router.delete("/:serviceId", serviceIdValidator, validate, deleteService);
+router.delete("/:serviceId", requireOwner, serviceIdValidator, validate, deleteService);
 
 export default router;

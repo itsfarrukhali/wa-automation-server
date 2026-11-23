@@ -10,14 +10,14 @@ import {
   validate,
 } from "../../../utils/validators/report.validator.js";
 import {
-  requireStaff,
+  requireOwner,
   requireVerifiedEmail,
   verifyToken,
 } from "../../../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.use(verifyToken, requireVerifiedEmail, requireStaff);
+router.use(verifyToken, requireVerifiedEmail, requireOwner);
 
 router.get("/overview", dateRangeValidator, validate, getOverviewReport);
 router.get("/revenue", dateRangeValidator, validate, getRevenueReport);

@@ -25,14 +25,14 @@ import {
   validate,
 } from "../../../utils/validators/campaign.validator.js";
 import {
-  requireStaff,
+  requireOwner,
   requireVerifiedEmail,
   verifyToken,
 } from "../../../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.use(verifyToken, requireVerifiedEmail, requireStaff);
+router.use(verifyToken, requireVerifiedEmail, requireOwner);
 
 router.get("/", listCampaignsValidator, validate, listCampaigns);
 router.post("/", createCampaignValidator, validate, createCampaign);

@@ -16,6 +16,7 @@ import {
   validate,
 } from "../../../utils/validators/template.validator.js";
 import {
+  requireOwner,
   requireStaff,
   requireVerifiedEmail,
   verifyToken,
@@ -26,11 +27,11 @@ const router = Router();
 router.use(verifyToken, requireVerifiedEmail, requireStaff);
 
 router.get("/", listTemplatesValidator, validate, listTemplates);
-router.post("/", createTemplateValidator, validate, createTemplate);
-router.get("/stats", getTemplateStats);
-router.post("/sync", syncTemplatesFromMeta);
-router.patch("/:templateId", updateTemplateValidator, validate, updateTemplate);
-router.delete("/:templateId", templateIdValidator, validate, deleteTemplate);
+router.post("/", requireOwner, createTemplateValidator, validate, createTemplate);
+router.get("/stats", requireOwner, getTemplateStats);
+router.post("/sync", requireOwner, syncTemplatesFromMeta);
+router.patch("/:templateId", requireOwner, updateTemplateValidator, validate, updateTemplate);
+router.delete("/:templateId", requireOwner, templateIdValidator, validate, deleteTemplate);
 router.post("/:templateId/mark-used", templateIdValidator, validate, markTemplateUsed);
 
 export default router;

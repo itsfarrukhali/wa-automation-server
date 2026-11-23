@@ -225,12 +225,18 @@ export const deleteUser = async (targetUserId, actorUserId) => {
   const user = await User.findById(targetUserId);
   if (!user) throw new AppError("User not found", 404);
 
-  if (user.businessId) {
+  // A staff member belongs to a business but does not own it. Deleting that
+  // account must never remove the entire tenant workspace.
+  if (user.role === "owner" && user.businessId) {
     await Business.findByIdAndDelete(user.businessId);
   }
 
   await User.findByIdAndDelete(targetUserId);
-  return { deletedUserId: targetUserId, deletedBusinessId: user.businessId };
+  return {
+    deletedUserId: targetUserId,
+    deletedBusinessId:
+      user.role === "owner" && user.businessId ? user.businessId : null,
+  };
 };
 
 // ─── Admin Management (Superadmin only) ──────────────────────────────────────
