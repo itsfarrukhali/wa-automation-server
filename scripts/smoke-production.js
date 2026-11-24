@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 const DEFAULT_FRONTEND_URL = "https://zario-web.vercel.app";
 const DEFAULT_BACKEND_URL = "https://wa-automation-server-vyzg.onrender.com";
 const REQUEST_TIMEOUT_MS = 30_000;
