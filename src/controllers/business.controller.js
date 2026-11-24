@@ -28,6 +28,7 @@ export const getOnboardingStatus = asyncHandler(async (req, res) => {
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const stats = await BusinessService.getDashboardStats(req.user.userId);
+  if (req.user.role === "staff") delete stats.plan;
   return ApiResponseUtil.success(res, stats);
 });
 

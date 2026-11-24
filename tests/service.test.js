@@ -368,4 +368,35 @@ describe("Service Catalog API", () => {
     assert.equal(campaigns.status, 403);
     assert.equal(reports.status, 403);
   });
+
+  it("blocks staff from business configuration and billing metadata", async () => {
+    const token = await createStaffToken();
+    const ownerOnlyRequests = [
+      request(app).get("/api/v1/business/plan"),
+      request(app).patch("/api/v1/business/profile").send({}),
+      request(app).patch("/api/v1/business/settings").send({}),
+      request(app).patch("/api/v1/business/working-hours/mon").send({}),
+      request(app).patch("/api/v1/business/engagement").send({}),
+      request(app).patch("/api/v1/business/onboarding/step-1").send({}),
+    ];
+
+    const responses = await Promise.all(
+      ownerOnlyRequests.map((pendingRequest) =>
+        pendingRequest.set("Authorization", `Bearer ${token}`),
+      ),
+    );
+
+    responses.forEach((response) => assert.equal(response.status, 403));
+  });
+
+  it("keeps the staff dashboard operational without exposing plan details", async () => {
+    const token = await createStaffToken();
+    const response = await request(app)
+      .get("/api/v1/business/dashboard")
+      .set("Authorization", `Bearer ${token}`);
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.data.business.id, business._id.toString());
+    assert.equal(Object.hasOwn(response.body.data, "plan"), false);
+  });
 });

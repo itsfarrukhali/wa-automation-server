@@ -54,23 +54,65 @@ router.use(verifyToken, requireVerifiedEmail);
 
 router.get("/me", getMyBusiness);
 router.get("/dashboard", getDashboard);
-router.get("/plan", getPlan);
+router.get("/plan", requireOwner, getPlan);
 router.get("/whatsapp/status", requireOwner, getWhatsAppConnectionStatus);
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
 
 router.get("/onboarding/status", getOnboardingStatus);
 
-router.patch("/onboarding/step-1", step1Validator, validate, onboardStep1);
-router.patch("/onboarding/step-2", step2Validator, validate, onboardStep2);
-router.patch("/onboarding/step-3", step3Validator, validate, onboardStep3);
-router.patch("/onboarding/step-4", step4Validator, validate, onboardStep4);
-router.patch("/onboarding/step-5", step5Validator, validate, onboardStep5);
+router.patch(
+  "/onboarding/step-1",
+  requireOwner,
+  step1Validator,
+  validate,
+  onboardStep1,
+);
+router.patch(
+  "/onboarding/step-2",
+  requireOwner,
+  step2Validator,
+  validate,
+  onboardStep2,
+);
+router.patch(
+  "/onboarding/step-3",
+  requireOwner,
+  step3Validator,
+  validate,
+  onboardStep3,
+);
+router.patch(
+  "/onboarding/step-4",
+  requireOwner,
+  step4Validator,
+  validate,
+  onboardStep4,
+);
+router.patch(
+  "/onboarding/step-5",
+  requireOwner,
+  step5Validator,
+  validate,
+  onboardStep5,
+);
 
 // ── Post-Onboarding Updates ───────────────────────────────────────────────────
 
-router.patch("/profile", profileUpdateValidator, validate, updateProfile);
-router.patch("/settings", settingsValidator, validate, updateSettings);
+router.patch(
+  "/profile",
+  requireOwner,
+  profileUpdateValidator,
+  validate,
+  updateProfile,
+);
+router.patch(
+  "/settings",
+  requireOwner,
+  settingsValidator,
+  validate,
+  updateSettings,
+);
 router.patch(
   "/whatsapp/reconnect",
   requireOwner,
@@ -81,11 +123,18 @@ router.patch(
 
 router.patch(
   "/working-hours/:day",
+  requireOwner,
   workingHoursDayValidator,
   validate,
   updateWorkingHoursDay,
 );
 
-router.patch("/engagement", engagementValidator, validate, updateEngagement);
+router.patch(
+  "/engagement",
+  requireOwner,
+  engagementValidator,
+  validate,
+  updateEngagement,
+);
 
 export default router;
