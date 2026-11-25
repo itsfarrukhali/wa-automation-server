@@ -163,13 +163,13 @@ export const step5Validator = [
     .withMessage("phoneNumberId is required")
     .trim(),
 
-  body("wabaId").optional().trim(),
+  body("wabaId").notEmpty().withMessage("wabaId is required").trim(),
 
   body("displayPhoneNumber").optional().trim(),
 
   body("verifiedName").optional().trim(),
 
-  body("accessToken").optional().trim(),
+  body("accessToken").notEmpty().withMessage("accessToken is required").trim(),
 ];
 
 export const whatsappReconnectValidator = [

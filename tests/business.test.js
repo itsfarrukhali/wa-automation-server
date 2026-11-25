@@ -631,24 +631,57 @@ describe("BusinessService.completeStep4Engagement", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("BusinessService.completeStep5WhatsApp", () => {
-  it("connects WhatsApp and marks onboarding complete", async () => {
+  it("verifies number and WABA with Meta before completing onboarding", async () => {
     const { user } = await seedUserAndBusiness({ onboardingStep: 4 });
-
-    const result = await BusinessService.completeStep5WhatsApp(
-      user._id.toString(),
-      {
+    const originalFetch = global.fetch;
+    const requests = [];
+    global.fetch = async (url) => {
+      requests.push(String(url));
+      return {
+        ok: true,
+        json: async () => String(url).includes("phone_numbers")
+          ? { data: [{ id: "123456789" }] }
+          : String(url).includes("subscribed_apps")
+            ? { success: true }
+            : { id: "123456789", display_phone_number: "+923001234567", verified_name: "Test Salon" },
+      };
+    };
+    let result;
+    try {
+      result = await BusinessService.completeStep5WhatsApp(user._id.toString(), {
         phoneNumberId: "123456789",
         wabaId: "waba_abc",
-        displayPhoneNumber: "+923001234567",
-        verifiedName: "Test Salon",
-      },
-    );
+        accessToken: "test-access-token",
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
 
     assert.equal(result.whatsapp.connectionStatus, "connected");
     assert.equal(result.whatsapp.phoneNumberId, "123456789");
     assert.equal(result.whatsappVerified, true);
     assert.equal(result.onboardingComplete, true);
     assert.ok(result.onboardingCompletedAt instanceof Date);
+    assert.equal(requests.length, 3);
+  });
+
+  it("does not mark onboarding complete when Meta rejects the number", async () => {
+    const { user, business } = await seedUserAndBusiness({ onboardingStep: 4 });
+    const originalFetch = global.fetch;
+    global.fetch = async () => ({ ok: false, json: async () => ({ error: { code: 190 } }) });
+    try {
+      await assert.rejects(
+        () => BusinessService.completeStep5WhatsApp(user._id.toString(), {
+          phoneNumberId: "123456789", wabaId: "waba_abc", accessToken: "bad-token",
+        }),
+        (err) => err.statusCode === 422,
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+    const saved = await business.constructor.findById(business._id);
+    assert.equal(saved.onboardingComplete, false);
+    assert.notEqual(saved.whatsapp.connectionStatus, "connected");
   });
 
   it("throws 422 when phoneNumberId is missing", async () => {
@@ -661,7 +694,7 @@ describe("BusinessService.completeStep5WhatsApp", () => {
         }),
       (err) => {
         assert.equal(err.statusCode, 422);
-        assert.ok(err.message.includes("phoneNumberId"));
+        assert.ok(err.message.includes("Phone Number ID"));
         return true;
       },
     );

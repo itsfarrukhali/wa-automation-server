@@ -249,77 +249,23 @@ export const completeStep5WhatsApp = async (userId, data) => {
   const business = await getOwnedBusiness(userId);
   assertStepOrder(business.onboardingStep, 5);
 
-  const {
-    phoneNumberId,
-    wabaId,
-    displayPhoneNumber,
-    verifiedName,
-    accessToken,
-  } = data;
-
-  if (!phoneNumberId) {
-    throw new AppError("phoneNumberId is required to connect WhatsApp.", 422);
-  }
-
-  business.whatsapp.phoneNumberId = phoneNumberId;
-  if (wabaId) business.whatsapp.wabaId = wabaId;
-  if (displayPhoneNumber)
-    business.whatsapp.displayPhoneNumber = displayPhoneNumber;
-  if (verifiedName) business.whatsapp.verifiedName = verifiedName;
-
-  // Encrypt access token before storage (whatsappSchema.encryptToken returns an object)
-  if (accessToken) {
-    const encrypted = business.whatsapp.encryptToken(accessToken);
-    // Store as a JSON string because the schema expects a String field.
-    // TODO: In production, adjust the schema to have separate iv/tag fields for cleaner handling.
-    business.whatsapp.accessToken = JSON.stringify(encrypted);
-
-    // Derive token expiry if available; prefer explicit fields, then JWT 'exp',
-    // otherwise fall back to a long default (1 year) so isConnected() can work.
-    let expiresAt = null;
-    if (typeof accessToken === "object") {
-      if (accessToken.expires_at) expiresAt = new Date(accessToken.expires_at);
-      else if (accessToken.expiresIn) expiresAt = new Date(Date.now() + Number(accessToken.expiresIn) * 1000);
-      else if (accessToken.expiresInSeconds)
-        expiresAt = new Date(Date.now() + Number(accessToken.expiresInSeconds) * 1000);
-    } else if (typeof accessToken === "string") {
-      // Try to decode JWT payload to read `exp` claim
-      try {
-        const parts = accessToken.split(".");
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
-          if (payload.exp) expiresAt = new Date(payload.exp * 1000);
-        }
-      } catch (e) {
-        // ignore parse errors
-      }
-    }
-
-    if (!expiresAt) {
-      expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // default 1 year
-    }
-    business.whatsapp.tokenExpiresAt = expiresAt;
-  }
-
-  business.whatsapp.connectionStatus = "connected";
-  business.whatsapp.lastConnectedAt = new Date();
-  business.whatsappVerified = true;
-
-  business.markModified("whatsapp");
-
-  advanceOnboardingStep(business, 5);
-  await business.save();
-  return business;
+  const connectedBusiness = await reconnectWhatsApp(userId, data);
+  advanceOnboardingStep(connectedBusiness, 5);
+  await connectedBusiness.save();
+  return connectedBusiness;
 };
 
 export const reconnectWhatsApp = async (userId, data) => {
   const business = await getOwnedBusiness(userId);
   const { phoneNumberId, wabaId, accessToken } = data;
+  if (!phoneNumberId || !wabaId || !accessToken) {
+    throw new AppError("Phone Number ID, WhatsApp Business Account ID, and access token are required.", 422);
+  }
   const graphBase = `https://graph.facebook.com/${env.WHATSAPP_GRAPH_VERSION}`;
 
   const response = await fetch(
     `${graphBase}/${encodeURIComponent(phoneNumberId)}?fields=id,display_phone_number,verified_name,quality_rating`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
+    { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(10_000) },
   );
   const result = await response.json();
 
@@ -336,7 +282,7 @@ export const reconnectWhatsApp = async (userId, data) => {
 
   const wabaPhonesResponse = await fetch(
     `${graphBase}/${encodeURIComponent(wabaId)}/phone_numbers?fields=id&limit=100`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
+    { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(10_000) },
   );
   const wabaPhones = await wabaPhonesResponse.json();
   const phoneBelongsToWaba = wabaPhones?.data?.some(
@@ -356,6 +302,7 @@ export const reconnectWhatsApp = async (userId, data) => {
     {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(10_000),
     },
   );
   const subscription = await subscriptionResponse.json();
